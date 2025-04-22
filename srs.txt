@@ -1,0 +1,281 @@
+Software Requirements Specification (SRS)
+AI-Powered Inventory Management System with Advanced Analytics and Visual Interface
+Stack: Django + React + PostgreSQL + AI/ML (Forecasting & Insights)
+
+1. Introduction
+1.1 Purpose
+The goal of this system is to create a feature-rich, AI-enhanced inventory management platform that is both powerful and elegant. The platform will help businesses:
+
+Manage inventory with images for clarity
+
+Track real-time stock, suppliers, and transactions
+
+Analyze detailed daily/monthly/quarterly/yearly statistics
+
+Forecast trends and make data-driven decisions using AI
+
+Operate through a beautiful, responsive, and interactive UI
+
+1.2 Scope
+The application includes:
+
+Full CRUD inventory with image uploads
+
+AI modules for forecasting, alerts, and analytics
+
+Comprehensive statistics: sales, profits, losses, growth trends, best-sellers
+
+Clean and modern theme/UI design
+
+Exportable data and visual dashboards
+
+User roles with custom dashboards
+
+1.3 Intended Audience
+Business Owners
+
+Inventory Managers
+
+Store Admins
+
+Software Developers and AI Engineers
+
+Data Analysts
+
+2. Overall Description
+2.1 Product Perspective
+The system blends traditional inventory management with modern AI-driven insights and a beautiful SPA frontend. It will:
+
+Run in browsers (responsive design for desktop/tablet/mobile)
+
+Use a RESTful API between Django and React
+
+Store data securely in PostgreSQL
+
+Handle media (images) via Django media storage
+
+Use AI to provide actionable insights
+
+2.2 Product Features (Expanded)
+✅ Add/Edit Products with images
+
+✅ Stock In / Out with reason & logs
+
+✅ Attach multiple images per product (carousel view)
+
+✅ Daily/Monthly/Annual sales, profit, and loss tracking
+
+✅ AI Predictions: future demand, restocking schedules
+
+✅ Graphs: line charts, bar charts, pie charts, KPI cards
+
+✅ Alerts: low stock, anomalies, profit drop alerts
+
+✅ Reports: downloadable (CSV, PDF)
+
+✅ Advanced filtering (by product, supplier, date, category)
+
+✅ Beautiful UI with dark/light theme support
+
+✅ Role-based dashboards (Admin, Manager, Staff)
+
+2.3 Users and Permissions
+
+Role	Capabilities
+Admin	Full access to system, users, roles, products, AI tools, stats, and reports
+Manager	Access inventory, stats, AI, reports, but not system settings
+Staff	View & update stock, upload images, limited dashboard
+2.4 Operating Environment
+Django 4+
+
+React 18+
+
+PostgreSQL 15+
+
+Node.js 18+
+
+Hosted on cloud (e.g., AWS, Vercel, or Heroku)
+
+AI Model hosting via Python microservice or cloud APIs
+
+3. Specific Requirements
+3.1 Functional Requirements (Expanded)
+3.1.1 Inventory Module
+Add/edit/delete products with:
+
+Name, SKU, quantity, unit price, cost price
+
+Primary image and gallery images (carousel view)
+
+Category and supplier links
+
+Automatic thumbnail generation
+
+Bulk product upload via CSV with image URL mappings
+
+3.1.2 Stock Tracking
+Record stock-in / stock-out with:
+
+User, quantity, reason, source, time
+
+Images (e.g., damaged stock proof)
+
+Tagging (return, restock, adjustment)
+
+3.1.3 Categories & Suppliers
+Add/edit/delete product categories
+
+Add/edit/delete supplier profiles:
+
+Contact info, address, tax ID, payment terms
+
+3.1.4 Sales, Profits & Losses Tracking
+Record sales transactions
+
+Calculate:
+
+Gross & net profit/loss per day/month/year
+
+Cost of Goods Sold (COGS)
+
+Return percentage
+
+Dynamic profit calculators per item and period
+
+3.1.5 AI Features
+🔍 Smart Forecasting: Demand predictions using past trends
+
+🔁 Restocking AI: Auto-suggest quantity + ETA based on supplier lead times
+
+🔔 Smart Alerts:
+
+Low stock forecast (before it happens)
+
+Profit margin drop alerts
+
+Product selling faster/slower than average
+
+📊 Anomaly Detection: Spot outliers in inventory movement
+
+3.1.6 Reporting & Statistics
+📈 Daily Stats:
+
+Sales count, income, expenses, profit
+
+Top-selling products
+
+📅 Monthly / Yearly Reports:
+
+Income vs expense graphs
+
+Inventory turnover ratio
+
+Profit & loss trend
+
+🧠 AI Insights Panel:
+
+Suggested orders
+
+Sales forecast (7/30/90 days)
+
+Slow/fast moving items
+
+📁 Export:
+
+All reports to CSV or PDF
+
+Include charts, KPIs, and data tables
+
+3.2 Non-Functional Requirements
+3.2.1 UI/UX
+Modern, clean theme (dark/light switch)
+
+Animations & transitions (React Animations)
+
+Mobile-first responsive design
+
+Live updates (WebSocket or polling for real-time stock)
+
+3.2.2 Performance
+System should respond to CRUD/API actions within 300–800ms
+
+ML model response time: under 3s for batch predictions
+
+3.2.3 Security
+Secure auth via JWT
+
+Encrypted file/image storage
+
+CSRF, CORS, and rate limiting
+
+3.2.4 Scalability
+Scalable AI microservice architecture
+
+Cloud DB scaling (read/write separation optional)
+
+4. External Interfaces
+4.1 User Interface (React Frontend)
+Beautiful, animated dashboard with the following:
+
+Inventory Carousel: Product images with hover stats
+
+AI Panel: Restock suggestions, anomalies
+
+Daily Snapshot Card: Sales today, income, top item
+
+Statistics Page: Interactive graphs, filters, KPIs
+
+Themes: Toggle between light and dark
+
+4.2 Backend API (Django REST Framework)
+/api/products/ — CRUD for products
+
+/api/stock-in/, /api/stock-out/ — Inventory movements
+
+/api/sales/ — Record and fetch sales data
+
+/api/ai/forecast/ — AI forecasting endpoint
+
+/api/statistics/ — Daily/monthly analytics
+
+/api/media/ — Secure media handling
+
+4.3 AI/ML Services
+Hosted microservices or OpenAI-like APIs
+
+Endpoints:
+
+/ai/predict-demand/
+
+/ai/restock-suggestion/
+
+/ai/anomaly-detection/
+
+4.4 Image Storage
+Uploaded via React forms
+
+Stored using Django Media (AWS S3, local, or Cloudinary)
+
+Image compression and resizing handled at upload
+
+5. Appendix & Extras
+5.1 Future Enhancements
+Barcode scanning via camera
+
+Voice commands for stock updates
+
+WhatsApp/email notifications for alerts
+
+Multi-location/branch support
+
+Supplier auto-order integration (APIs)
+
+5.2 Development Tools
+Version control: GitHub
+
+CI/CD: GitHub Actions or Vercel
+
+ML: Python (scikit-learn, Prophet), optional Hugging Face
+
+Design system: Material UI or Tailwind CSS
+
