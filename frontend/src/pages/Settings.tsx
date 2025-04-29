@@ -1,11 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   RiUserSettingsLine,
-  RiNotification3Line,
-  RiPaletteLine,
-  RiBellLine,
   RiLockLine,
-  RiGlobalLine,
   RiTeamLine,
   RiAddLine,
   RiEditLine,
@@ -28,6 +24,8 @@ import {
 import toast from 'react-hot-toast'
 import { SecuritySection } from '../components/settings/SecuritySection'
 import { UserManagementSection } from '../components/settings/UserManagementSection'
+import { BusinessSection } from '../components/settings/BusinessSection'
+import { ProfileSection } from '../components/settings/ProfileSection'
 
 const settingsSections = [
   {
@@ -45,38 +43,10 @@ const settingsSections = [
     adminOnly: false,
   },
   {
-    id: 'notifications',
-    name: 'Notifications',
-    icon: RiNotification3Line,
-    description: 'Configure your notification preferences',
-    adminOnly: false,
-  },
-  {
-    id: 'appearance',
-    name: 'Appearance',
-    icon: RiPaletteLine,
-    description: 'Customize the look and feel of your interface',
-    adminOnly: false,
-  },
-  {
-    id: 'alerts',
-    name: 'Alert Settings',
-    icon: RiBellLine,
-    description: 'Set up inventory and stock alerts',
-    adminOnly: false,
-  },
-  {
     id: 'security',
     name: 'Security',
     icon: RiLockLine,
     description: 'Manage your security preferences',
-    adminOnly: false,
-  },
-  {
-    id: 'system',
-    name: 'System',
-    icon: RiGlobalLine,
-    description: 'Configure system-wide settings',
     adminOnly: false,
   },
   {
@@ -147,9 +117,16 @@ export const Settings = () => {
       </div>
 
       {/* Active Section Content */}
-      {activeSection === 'security' && <SecuritySection user={user} />}
-      {activeSection === 'users' && <UserManagementSection currentUser={user} />}
-      {/* Add other sections similarly */}
-    </div>
-  )
-}
+      <div className="mt-8">
+        {activeSection === 'business' && <BusinessSection />}
+        {activeSection === 'profile' && <ProfileSection user={user} />}
+        {activeSection === 'security' && <SecuritySection user={user} />}
+        {activeSection === 'users' && <UserManagementSection currentUser={user} />}
+        {activeSection === 'notifications' && (
+          <div className="text-gray-400">Notification settings coming soon...</div>
+        )}
+        {activeSection === 'appearance' && (
+          <div className="text-gray-400">Appearance settings coming soon...</div>
+        )}
+        {activeSection === 'alerts' && (
+          <div className="text-gray-400">Alert settings coming soon...</div>        )}        {activeSection === 'system' && (          <div className="text-gray-400">System settings coming soon...</div>        )}      </div>    </div>  )}

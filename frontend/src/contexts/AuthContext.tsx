@@ -13,6 +13,7 @@ interface AuthContextType {
   logout: () => void;
   isAdmin: () => boolean;
   isManager: () => boolean;
+  updateUserData: (userData: UserData) => void;
 }
 
 // Create the context
@@ -32,7 +33,7 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const navigate = useNavigate();
@@ -123,19 +124,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return user?.role === 'admin' || user?.role === 'manager';
   };
 
-  // Provide the auth context value
-  const value: AuthContextType = {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    login,
-    register,
-    logout,
-    isAdmin,
-    isManager,
-  };
+  const updateUserData = (userData: UserData) => {
+    setUser(userData)
+  }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+  return (
+    <AuthContext.Provider value={{
+      user,
+      isLoading,
+      isAuthenticated: !!user,
+      login,
+      register,
+      logout,
+      isAdmin,
+      isManager,
+      updateUserData,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
 
 export default AuthContext;

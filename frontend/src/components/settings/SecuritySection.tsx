@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { RiAlertLine } from 'react-icons/ri'
-import { userPasswordAPI } from '../../services/api'
+import { userAPI } from '../../services/api'
+import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 const formStyles = {
@@ -18,41 +19,52 @@ const formStyles = {
     shadow-lg shadow-orange-500/20`
 }
 
-export const SecuritySection = ({ user }: { user: any }) => {
-  const [passwordData, setPasswordData] = useState({
-    old_password: '',  // Changed from current_password to match API expectation
-    new_password: '',
-    confirm_password: ''
-  })
+export const SecuritySection = () => {
+  const { user } = useAuth(); // Add this line
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (passwordData.new_password !== passwordData.confirm_password) {
-      toast.error('New passwords do not match')
-      return
+    e.preventDefault();
+
+    // Validation checks
+    if (newPassword !== confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
     }
 
-    try {
-      // Send only the required fields to the API
-      const response = await userPasswordAPI.changePassword({
-        old_password: passwordData.old_password,
-        new_password: passwordData.new_password
-      })
-      
-      toast.success('Password changed successfully')
-      setPasswordData({
-        old_password: '',
-        new_password: '',
-        confirm_password: ''
-      })
-    } catch (error: any) {
-      // Better error handling
-      const errorMessage = error.response?.data?.message || 'Failed to change password'
-      toast.error(errorMessage)
-      console.error('Password change error:', error.response?.data)
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters long');
+      return;
     }
-  }
+
+    setIsLoading(true);
+
+    try {
+      await userAPI.changePassword({
+        current_password: currentPassword.trim(),
+        new_password: newPassword.trim(),
+        new_password_confirm: confirmPassword.trim() // Add this line
+      });
+
+      // Clear form after successful update
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      toast.success('Password updated successfully');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.new_password_confirm?.[0] 
+        || error.response?.data?.detail 
+        || 'Failed to change password';
+      
+      toast.error(errorMessage);
+      console.error('Password change error:', error.response?.data);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className={formStyles.wrapper}>
@@ -76,8 +88,8 @@ export const SecuritySection = ({ user }: { user: any }) => {
             name="old_password"
             className={formStyles.input}
             placeholder="Enter your current password"
-            value={passwordData.old_password}
-            onChange={e => setPasswordData(prev => ({ ...prev, old_password: e.target.value }))}
+            value={currentPassword}
+            onChange={e => setCurrentPassword(e.target.value)}
             required
           />
         </div>
@@ -91,8 +103,8 @@ export const SecuritySection = ({ user }: { user: any }) => {
             name="new_password"
             className={formStyles.input}
             placeholder="Enter new password"
-            value={passwordData.new_password}
-            onChange={e => setPasswordData(prev => ({ ...prev, new_password: e.target.value }))}
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
             required
             minLength={8}
           />
@@ -107,14 +119,14 @@ export const SecuritySection = ({ user }: { user: any }) => {
             name="confirm_password"
             className={formStyles.input}
             placeholder="Confirm new password"
-            value={passwordData.confirm_password}
-            onChange={e => setPasswordData(prev => ({ ...prev, confirm_password: e.target.value }))}
+            value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)}
             required
           />
         </div>
 
-        <button type="submit" className={formStyles.button}>
-          Update Password
+        <button type="submit" className={formStyles.button} disabled={isLoading}>
+          {isLoading ? 'Updating...' : 'Update Password'}
         </button>
       </form>
     </div>

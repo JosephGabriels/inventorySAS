@@ -552,171 +552,60 @@ export const salesAPI = {
 export interface BusinessSettings {
   id?: number;
   business_name: string;
-  logo?: string | null;
-  address?: string;
-  phone?: string;
-  email?: string;
-  tax_id?: string;
-  currency?: string;
+  address: string;
+  phone: string;
+  email: string;
+  tax_rate: number;
   updated_at?: string;
   updated_by?: number | null;
 }
 
 export const businessSettingsAPI = {
-  getSettings: async (): Promise<BusinessSettings> => {
-    try {
-      const response = await api.get('/api/business-settings/')
-      // Return the first item or a default object
-      return response.data.length > 0 
-        ? response.data[0] 
-        : { business_name: 'Inventory Management System' }
-    } catch (error) {
-      console.error('Business Settings API Error:', error)
-      return { business_name: 'Inventory Management System' }
-    }
+  getSettings: async () => {
+    const response = await api.get<BusinessSettings[]>('/api/business-settings/');
+    return response.data && response.data.length > 0 ? response.data[0] : null;
   },
-  
-  updateSettings: async (settings: BusinessSettings): Promise<BusinessSettings> => {
-    try {
-      if (settings.id) {
-        const response = await api.patch(`/api/business-settings/${settings.id}/`, settings)
-        return response.data
-      } else {
-        const response = await api.post('/api/business-settings/', settings)
-        return response.data
-      }
-    } catch (error) {
-      console.error('Update Business Settings Error:', error)
-      throw error
+
+  updateSettings: async (settings: Partial<BusinessSettings>) => {
+    const currentSettings = await businessSettingsAPI.getSettings();
+    
+    if (currentSettings?.id) {
+      const response = await api.patch<BusinessSettings>(
+        `/api/business-settings/${currentSettings.id}/`,
+        settings
+      );
+      return response.data;
+    } else {
+      const response = await api.post<BusinessSettings>(
+        '/api/business-settings/',
+        settings
+      );
+      return response.data;
     }
   }
+};
+
+interface ChangePasswordData {
+  current_password: string;
+  new_password: string;
+  new_password_confirm: string;
 }
 
-// Password Management
-export const userPasswordAPI = {
-  changePassword: async (old_password: string, new_password: string) => {
-    const response = await axios.post('/api/users/change_password/', {
-      old_password,
-      new_password
-    });
+export const userAPI = {
+  updateProfile: async (userId: number, data: Partial<UserData>) => {
+    const response = await api.patch<UserData>(`/api/users/${userId}/`, data);
     return response.data;
+  },
+
+  changePassword: async (data: ChangePasswordData) => {
+    try {
+      const response = await api.post('/api/users/change_password/', data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Password change error:', error.response?.data);
+      throw error;
+    }
   }
-}
-
-// Reports API - for real-time data across all report types
-export interface DailyStats {
-  date: string;
-  total_sales: number;
-  total_cost: number;
-  profit: number;
-  items_sold: number;
-  top_products: Array<{
-    product__name: string;
-    quantity: number;
-    revenue: number;
-  }>;
-}
-
-export interface MonthlyStats {
-  month: string;
-  total_sales: number;
-  total_cost: number;
-  profit: number;
-  items_sold: number;
-  growth_rate: number;
-}
-
-export interface InventoryReport {
-  total_products: number;
-  total_value: number;
-  low_stock: number;
-  by_category: Array<{
-    category__name: string;
-    count: number;
-    value: number;
-  }>;
-}
-
-export interface SalesAnalytics {
-  period: {
-    start_date: string;
-    end_date: string;
-    days: number;
-  };
-  total_stats: {
-    revenue: number;
-    cost: number;
-    profit: number;
-    quantity: number;
-  };
-  analytics: Array<{
-    product__category__name?: string;
-    product__name?: string;
-    total_quantity: number;
-    total_revenue: number;
-    total_cost: number;
-    profit: number;
-  }>;
-}
-
-export interface DairyStats {
-  period: {
-    start_date: string;
-    end_date: string;
-    days: number;
-  };
-  total_stats: {
-    revenue: number;
-    cost: number;
-    profit: number;
-    quantity: number;
-  };
-  dairy_products: Array<{
-    product__name: string;
-    total_quantity: number;
-    total_revenue: number;
-    total_cost: number;
-    profit: number;
-  }>;
-  categories_used: string[];
-}
-
-export const reportsAPI = {
-  // Get sales analytics by product or category
-  getSalesAnalytics: (params: { days?: number, group_by?: 'product' | 'category', start_date?: string, end_date?: string }) => 
-    api.get<SalesAnalytics>('/api/sales/analytics', { params }),
-  
-  // Get daily stats 
-  getDailyStats: () => api.get<DailyStats>('/api/stats/daily'),
-  
-  // Get monthly stats
-  getMonthlyStats: () => api.get<MonthlyStats[]>('/api/stats/monthly'),
-  
-  // Get yearly stats
-  getYearlyStats: () => api.get<MonthlyStats[]>('/api/stats/yearly'),
-  
-  // Get inventory report
-  getInventoryReport: () => api.get<InventoryReport>('/api/reports/inventory'),
-  
-  // Get financial report
-  getFinancialReport: (params: { start_date?: string, end_date?: string }) => 
-    api.get('/api/reports/financial', { params }),
-  
-  // Get audit report
-  getAuditReport: (params: { start_date?: string, end_date?: string }) => 
-    api.get('/api/reports/audit', { params }),
-    
-  // Generate a custom report
-  generateReport: (data: { type: string, start_date?: string, end_date?: string }) =>
-    api.post('/api/reports/generate', data),
-    
-  // Get dairy stats
-  getDairyStats: (params: { days?: number, start_date?: string, end_date?: string }) =>
-    api.get<DairyStats>('/api/dairy-stats', { params }),
-    
-  // Get product performance data
-  getProductPerformance: (params: { days?: number, category_id?: number }) =>
-    api.get<SalesAnalytics>('/api/products/performance', { params }),
 };
 
 
