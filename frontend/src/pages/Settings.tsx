@@ -27,6 +27,7 @@ import {
 } from '../services/api'
 import toast from 'react-hot-toast'
 import { SecuritySection } from '../components/settings/SecuritySection'
+import { UserManagementSection } from '../components/settings/UserManagementSection'
 
 const settingsSections = [
   {
@@ -147,6 +148,7 @@ export const Settings = () => {
 
       {/* Active Section Content */}
       {activeSection === 'security' && <SecuritySection user={user} />}
+      {activeSection === 'users' && <UserManagementSection currentUser={user} />}
       {/* Add other sections similarly */}
     </div>
   )

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useSales } from '../hooks/useSales'
-import { format } from 'date-fns'
+import { startOfDay, endOfDay, parseISO, format, isValid } from 'date-fns'
 import {
   RiFileTextLine,
   RiPrinterLine,
@@ -16,42 +16,46 @@ import { salesAPI, type Sale, type PrintReceiptData } from '../services/api'
 import toast from 'react-hot-toast'
 
 export const SalesHistory = () => {
-  const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateFilter, setDateFilter] = useState('')
-  const { sales = [], isLoading } = useSales()
+  
+  // Update the sales hook to use date parameters
+  const { data: sales = [], isLoading } = useSales(startDate, endDate)
 
-  const handlePrint = async (sale: Sale) => {
-    try {
-      const printData: PrintReceiptData = {
-        id: sale.id,
-        items: sale.items.map(item => ({
-          product: {
-            name: item.product_name || `Product #${item.product}`,
-            unit_price: Number(item.unit_price)
-          },
-          quantity: item.quantity
-        })),
-        total_amount: Number(sale.total_amount),
-        payment_method: sale.payment_method,
-        created_at: sale.created_at,
-        receipt_number: `INV-${sale.id.toString().padStart(4, '0')}`
-      }
-      await salesAPI.printReceipt(printData)
-      toast.success('Printing receipt...')
-    } catch (error) {
-      toast.error('Failed to print receipt')
+  // Simplify the filteredSales to only handle search since dates are filtered by API
+  const filteredSales = useMemo(() => {
+    return sales
+      .filter(sale => {
+        const searchMatch = 
+          sale.id.toString().includes(searchTerm) ||
+          sale.payment_method.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          sale.items.some(item => 
+            item.product_name?.toLowerCase().includes(searchTerm.toLowerCase())
+          );
+        return searchMatch;
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [sales, searchTerm]);
+
+  // Add date change handlers with validation
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value;
+    setStartDate(newDate);
+    if (endDate && newDate > endDate) {
+      setEndDate(newDate);
     }
-  }
+  };
 
-  const filteredSales = sales.filter(sale => {
-    const matchesSearch = sale.id.toString().includes(searchTerm) ||
-      sale.payment_method.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDate = !dateFilter || sale.created_at.includes(dateFilter)
-    return matchesSearch && matchesDate
-  })
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value;
+    if (!startDate) {
+      setStartDate(newDate);
+    }
+    setEndDate(newDate);
+  };
 
+  // Update the date inputs in your JSX
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -67,16 +71,47 @@ export const SalesHistory = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="relative">
-            <RiCalendarLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="date"
-              className="pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-            />
-          </div>
         </div>
+      </div>
+
+      <div className="flex gap-4 items-center">
+        <div className="relative">
+          <RiCalendarLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="date"
+            className="pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent w-44"
+            value={startDate}
+            onChange={handleStartDateChange}
+            max={format(new Date(), 'yyyy-MM-dd')}
+            placeholder="Start Date"
+          />
+        </div>
+        <span className="text-gray-400">to</span>
+        <div className="relative">
+          <RiCalendarLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="date"
+            className="pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent w-44"
+            value={endDate}
+            onChange={handleEndDateChange}
+            max={format(new Date(), 'yyyy-MM-dd')}
+            min={startDate}
+            placeholder="End Date"
+          />
+        </div>
+        {(startDate || endDate) && (
+          <button
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+              toast.success('Date filter cleared');
+            }}
+            className="p-2 text-gray-400 hover:text-white focus:outline-none"
+            title="Clear date filter"
+          >
+            <RiCloseLine className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       <div className="bg-dark-800 rounded-xl shadow-xl overflow-hidden">
