@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { stockMovementAPI } from '../services/api'
 import {
   RiAddLine,
   RiSearchLine,
@@ -18,31 +21,45 @@ interface StockMovement {
   reference?: string
 }
 
-const mockMovements: StockMovement[] = [
-  {
-    id: 1,
-    type: 'in',
-    productName: 'Laptop XPS 15',
-    quantity: 25,
-    reason: 'Restock',
-    date: '2025-04-19 09:30',
-    user: 'John Doe',
-    reference: 'PO-2025-001',
-  },
-  {
-    id: 2,
-    type: 'out',
-    productName: 'Wireless Mouse',
-    quantity: 5,
-    reason: 'Sale',
-    date: '2025-04-19 10:15',
-    user: 'Jane Smith',
-    reference: 'SO-2025-042',
-  },
-  // Add more mock movements as needed
-]
-
 export const StockMovements = () => {
+  // State management
+  const [search, setSearch] = useState('')
+  const [date, setDate] = useState('')
+  const [type, setType] = useState('')
+  const [page, setPage] = useState(1)
+
+  // Data fetching
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['stockMovements', { search, date, type, page }],
+    queryFn: () => stockMovementAPI.getAll({ search, date, type, page })
+  })
+
+  const movements = data?.results || []
+  const hasMore = data?.hasMore || false
+
+  // Event handlers
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value)
+    setPage(1) // Reset pagination when search changes
+  }
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDate(e.target.value)
+    setPage(1)
+  }
+
+  const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setType(e.target.value)
+    setPage(1)
+  }
+
+  const loadMore = () => {
+    setPage(prev => prev + 1)
+  }
+
+  if (isLoading) return <div>Loading...</div>
+  if (error) return <div>Error loading stock movements</div>
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -70,6 +87,8 @@ export const StockMovements = () => {
             <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
+              value={search}
+              onChange={handleSearch}
               placeholder="Search movements..."
               className="input-field pl-10 w-full"
             />
@@ -79,10 +98,16 @@ export const StockMovements = () => {
               <RiCalendarLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="date"
+                value={date}
+                onChange={handleDateChange}
                 className="input-field pl-10"
               />
             </div>
-            <select className="input-field">
+            <select 
+              value={type}
+              onChange={handleTypeChange}
+              className="input-field"
+            >
               <option value="">All Types</option>
               <option value="in">Stock In</option>
               <option value="out">Stock Out</option>
@@ -92,13 +117,13 @@ export const StockMovements = () => {
       </div>
 
       <div className="space-y-4">
-        {mockMovements.map((movement) => (
+        {movements.map((movement) => (
           <div
             key={movement.id}
             className="card p-4 flex items-center space-x-4"
           >
             <div
-              className={`p-3 rounded-full Ksh {
+              className={`p-3 rounded-full ${
                 movement.type === 'in'
                   ? 'bg-green-500/10 text-green-500'
                   : 'bg-red-500/10 text-red-500'
@@ -123,7 +148,7 @@ export const StockMovements = () => {
                 </div>
                 <div className="text-right">
                   <p
-                    className={`text-lg font-medium Ksh {
+                    className={`text-lg font-medium ${
                       movement.type === 'in'
                         ? 'text-green-500'
                         : 'text-red-500'
@@ -149,9 +174,16 @@ export const StockMovements = () => {
         ))}
       </div>
 
-      <div className="mt-6 flex justify-center">
-        <button className="btn-secondary">Load More</button>
-      </div>
+      {hasMore && (
+        <div className="mt-6 flex justify-center">
+          <button 
+            className="btn-secondary"
+            onClick={loadMore}
+          >
+            Load More
+          </button>
+        </div>
+      )}
     </div>
   )
 }

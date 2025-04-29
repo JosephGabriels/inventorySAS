@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   RiDashboardLine,
   RiArchiveLine,
@@ -12,8 +12,6 @@ import {
   RiBarChartBoxLine,
   RiFileListLine,
 } from 'react-icons/ri'
-import { useAuth } from '../../contexts/AuthContext'
-import { useBusiness } from '../../contexts/BusinessContext'
 
 interface NavItemProps {
   to: string
@@ -39,14 +37,6 @@ const NavItem = ({ to, icon, label }: NavItemProps) => (
 
 export const Sidebar = () => {
   const { user } = useAuth()
-  const { businessSettings } = useBusiness()
-  const [businessName, setBusinessName] = useState('Inventory Management System')
-  
-  useEffect(() => {
-    if (businessSettings && businessSettings.business_name) {
-      setBusinessName(businessSettings.business_name)
-    }
-  }, [businessSettings])
   
   const navigation = [
     { name: 'Dashboard', href: '/', icon: RiDashboardLine },
@@ -63,9 +53,6 @@ export const Sidebar = () => {
 
   return (
     <div className="w-64 bg-dark-800 border-r border-dark-700 flex-shrink-0">
-      <div className="h-16 flex items-center px-6">
-        <h1 className="text-xl font-bold text-white">{businessName}</h1>
-      </div>
       <nav className="mt-5 px-3 space-y-1">
         {navigation.map((item) => (
           <NavItem key={item.href} to={item.href} icon={<item.icon />} label={item.name} />

@@ -284,30 +284,23 @@ export const productAPI = {
 
 // Categories API
 export const categoryAPI = {
-  getAll: async (): Promise<Category[]> => {
-    try {
-      console.log('Fetching categories...')
-      const response = await api.get('/api/categories/')
-      
-      // Check if response exists and has data
-      if (!response || !response.data) {
-        console.error('Invalid categories response:', response)
-        throw new Error('Failed to fetch categories: Invalid response')
-      }
-      
-      // Log successful response
-      console.log('Categories response:', response.data)
-      
-      // Return the data array or empty array as fallback
-      return Array.isArray(response.data) ? response.data : []
-    } catch (error: any) {
-      console.error('Categories fetch error:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data
-      })
-      throw new Error(`Failed to fetch categories: ${error.message}`)
-    }
+  getAll: async () => {
+    const response = await api.get('/api/categories/')
+    return response.data
+  },
+  
+  create: async (data: CategoryFormData) => {
+    const response = await api.post('/api/categories/', data)
+    return response.data
+  },
+  
+  update: async (id: number, data: CategoryFormData) => {
+    const response = await api.put(`/api/categories/${id}/`, data)
+    return response.data
+  },
+  
+  delete: async (id: number) => {
+    await api.delete(`/api/categories/${id}/`)
   }
 }
 
@@ -338,9 +331,57 @@ export const supplierAPI = {
 }
 
 // Stock Movements
+interface StockMovementResponse {
+  results: StockMovement[]
+  hasMore: boolean
+  total: number
+}
+
 export const stockMovementAPI = {
-  getAll: () => api.get('/api/stock-movements/'),
-  create: (data: any) => api.post('/api/stock-movements/', data),
+  getAll: async ({ search, date, type, page }: {
+    search?: string
+    date?: string
+    type?: string
+    page?: number
+  }): Promise<StockMovementResponse> => {
+    try {
+      const params = new URLSearchParams()
+      if (search) params.append('search', search)
+      if (date) params.append('date', date)
+      if (type) params.append('type', type)
+      if (page) params.append('page', String(page))
+
+      // Fix: Add /api/ prefix to the URL
+      const response = await api.get(`/api/stock-movements/?${params}`)
+      return {
+        results: response.data || [],
+        hasMore: response.data.length === 10,
+        total: response.data.length
+      }
+    } catch (error) {
+      console.error('Stock movements API error:', error)
+      return {
+        results: [],
+        hasMore: false,
+        total: 0
+      }
+    }
+  },
+  
+  // Add other stock movement methods
+  create: async (data: { product: string; type: 'in' | 'out'; quantity: number; reason: string }) => {
+    const response = await api.post('/api/stock-movements/', data)
+    return response.data
+  },
+  
+  update: async (id: number, data: { product: string; type: 'in' | 'out'; quantity: number; reason: string }) => {
+    const response = await api.put(`/api/stock-movements/${id}/`, data)
+    return response.data
+  },
+  
+  delete: async (id: number) => {
+    await api.delete(`/api/stock-movements/${id}/`)
+  }
 }
 
 // Sales

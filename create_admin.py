@@ -34,7 +34,7 @@ print(f"{status} admin user: {admin.username}")
 business, created = BusinessSettings.objects.get_or_create(
     id=1,
     defaults={
-        'business_name': "Inventory Management System",
+        'business_name': "bb",
         'business_address': "123 Main St, Anytown, USA",
         'business_phone': "555-123-4567",
         'business_email': "contact@inventory.example.com",

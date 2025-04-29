@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { RiAddLine, RiSubtractLine, RiDeleteBinLine, RiShoppingCartLine, RiPrinterLine, RiCloseLine } from 'react-icons/ri'
+import { RiAddLine, RiSubtractLine, RiDeleteBinLine, RiShoppingCartLine, RiPrinterLine, RiCloseLine, RiSearchLine } from 'react-icons/ri'
 import { productAPI, salesAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer'
@@ -435,6 +435,18 @@ export const PointOfSale = () => {
       <div className="flex-1 p-6 overflow-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-white mb-4">Point of Sale</h1>
+          
+          {/* Add this search bar */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search products..."
+              className="w-full bg-[#2a3346]/80 text-white placeholder-gray-400 rounded-xl px-4 py-3 pl-10 border border-[#31394d]/70 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50 transition-all duration-300"
+            />
+            <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+          </div>
         </div>
 
         {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 ? (
