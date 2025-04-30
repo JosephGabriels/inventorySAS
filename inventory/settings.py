@@ -39,7 +39,7 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'dpg-d08gg1adbo4c73acqrlg-a.oregon-postgres.render.com',
     '.render.com',  # Allows all subdomains on render.com
-    'your-app-name.onrender.com',  # Replace with your actual Render app domain
+    'inventorysas-1.onrender.com',  # Replace with your actual Render app domain
 ]
 
 # Update CORS settings too
@@ -48,7 +48,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
-    "https://your-frontend-app.onrender.com",  # Add your frontend domain
+    "https://inventorysas-1.onrender.com",  # Add your frontend domain
 ]
 
 # Application definition
