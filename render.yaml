@@ -1,0 +1,49 @@
+services:
+  # Django web service
+  - type: web
+    name: inventory-backend
+    env: python
+    buildCommand: pip install -r requirements.txt && chmod +x build.sh && ./build.sh
+    startCommand: gunicorn inventory.wsgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: WEB_CONCURRENCY
+        value: 4
+      - key: DEBUG
+        value: false
+      - key: DJANGO_SETTINGS_MODULE
+        value: inventory.settings_production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: DJANGO_SUPERUSER_USERNAME
+        sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+      - key: DATABASE_URL
+        sync: false # User will manually set this in the Render dashboard
+    autoDeploy: true
+
+  # Frontend web service - for future use
+  # - type: web
+  #   name: inventory-frontend
+  #   env: node
+  #   buildCommand: cd frontend && npm ci && npm run build
+  #   startCommand: cd frontend && npm run preview
+  #   envVars:
+  #     - key: NODE_VERSION
+  #       value: 18
+  #     - key: VITE_API_URL
+  #       fromService:
+  #         name: inventory-backend
+  #         type: web
+  #         property: url
+  #   autoDeploy: true
+
+# The database is already created in Render.com
+# Use environment variables to connect to the existing database
+# DATABASE_URL should be set to: postgresql://josephgabriels:PASSWORD@dpg-d08gg1adbo4c73acqrlg-a.oregon-postgres.render.com/inventory_db_0q4l
