@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -7,9 +7,17 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loginSuccess, setLoginSuccess] = useState(false);
   
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if ((isAuthenticated && !authLoading) || loginSuccess) {
+      navigate('/');
+    }
+  }, [isAuthenticated, authLoading, navigate, loginSuccess]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +33,14 @@ const Login: React.FC = () => {
     try {
       const success = await login({ username, password });
       if (success) {
-        navigate('/');
+        // Set success state for useEffect backup
+        setLoginSuccess(true);
+        
+        // Add a small delay to ensure state updates and toast completes
+        setTimeout(() => {
+          // Force navigation after delay
+          navigate('/');
+        }, 300);
       } else {
         setError('Invalid credentials. Please try again.');
       }

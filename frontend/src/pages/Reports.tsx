@@ -202,9 +202,11 @@ const ProductPerformanceTable = ({ data }: { data: SalesAnalytics['analytics'] }
 export const Reports = () => {
   const { products, isLoading: productsLoading } = useProducts();
   const { sales, isLoading: salesLoading } = useSales();
-  const [reportType, setReportType] = useState('');
+  const [reportType, setReportType] = useState('dairy');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [timePeriod, setTimePeriod] = useState<number>(1); // Default to 1 day
+  const [isCustomDate, setIsCustomDate] = useState<boolean>(false);
   const [dairyStats, setDairyStats] = useState<DairyStats>({
     totalSales: 0,
     totalCost: 0,
@@ -216,17 +218,79 @@ export const Reports = () => {
   });
   const [categoryData, setCategoryData] = useState<SalesAnalytics | null>(null);
   const [refreshInterval, setRefreshInterval] = useState<number>(60000); // 1 minute refresh by default
-
-  // Function to fetch category analytics data
-  const fetchCategoryAnalytics = async (days = 1) => {
-    setDairyStats(prev => ({ ...prev, isLoading: true, error: null }));
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reportData, setReportData] = useState<any>(null);
+  
+  // Function to fetch report data based on report type
+  const fetchReportData = async (type: string, days = timePeriod) => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
       const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await axios.get(`${baseURL}/api/sales/analytics?days=${days}&group_by=category`);
-      setCategoryData(response.data);
+      let url = '';
+      let params: any = {};
       
-      // Find dairy category data and calculate stats
-      const dairyCategory = response.data.analytics.find(
+      // Set URL and params based on report type
+      switch (type) {
+        case 'dairy':
+          url = `${baseURL}/api/dairy/stats`;
+          break;
+        case 'sales':
+          url = `${baseURL}/api/sales/analytics`;
+          params.group_by = 'date';
+          break;
+        case 'inventory':
+          url = `${baseURL}/api/inventory/analytics`;
+          break;
+        case 'financial':
+          url = `${baseURL}/api/sales/analytics`;
+          params.group_by = 'payment_method';
+          break;
+        case 'audit':
+          url = `${baseURL}/api/audit/logs`;
+          break;
+        default:
+          url = `${baseURL}/api/sales/analytics`;
+          params.group_by = 'category';
+      }
+      
+      // Add time parameters
+      if (isCustomDate && startDate && endDate) {
+        params.start_date = startDate;
+        params.end_date = endDate;
+      } else {
+        params.days = days;
+      }
+      
+      const response = await axios.get(url, { params });
+      setReportData(response.data);
+      
+      // Process data if it's dairy report
+      if (type === 'dairy') {
+        processDairyData(response.data);
+      } else {
+        setCategoryData(response.data);
+      }
+      
+      setIsLoading(false);
+    } catch (error) {
+      console.error(`Error fetching ${type} data:`, error);
+      setError(`Failed to fetch ${type} data. Please ensure the API server is running.`);
+      setIsLoading(false);
+    }
+  };
+  
+  // Process dairy data specifically
+  const processDairyData = (data: any) => {
+    setDairyStats(prev => ({ ...prev, isLoading: true, error: null }));
+    try {
+      // Extract data from the report response
+      const { total_stats, analytics } = data;
+      
+      // Find dairy category data
+      const dairyCategory = analytics?.find(
         (item: any) => item.product__category__name?.toLowerCase() === 'dairy'
       );
       
@@ -268,16 +332,17 @@ export const Reports = () => {
 
   // Fetch data on component mount and set up refresh interval
   useEffect(() => {
-    fetchCategoryAnalytics();
+    // Initial data fetch
+    fetchReportData(reportType);
     
     // Set up automatic refresh interval
     const intervalId = setInterval(() => {
-      fetchCategoryAnalytics();
+      fetchReportData(reportType);
     }, refreshInterval);
     
     // Clean up interval on component unmount
     return () => clearInterval(intervalId);
-  }, [refreshInterval]);
+  }, [refreshInterval, reportType, timePeriod, isCustomDate, startDate, endDate]);
 
   // Calculate statistics from real data in real-time
   const last30Days = new Date();
@@ -329,11 +394,40 @@ export const Reports = () => {
 
   // Trigger a manual refresh of the dairy data
   const handleRefreshDairyData = () => {
-    fetchCategoryAnalytics();
+    fetchReportData(reportType);
+  };
+  
+  // Handle report type change
+  const handleReportTypeChange = (type: string) => {
+    setReportType(type);
+    fetchReportData(type);
+  };
+  
+  // Handle time period change
+  const handleTimePeriodChange = (days: number) => {
+    setTimePeriod(days);
+    setIsCustomDate(false);
+    fetchReportData(reportType, days);
+  };
+  
+  // Toggle custom date mode
+  const handleCustomDateToggle = () => {
+    const newValue = !isCustomDate;
+    setIsCustomDate(newValue);
+    
+    if (newValue) {
+      // Set default date range if switching to custom
+      const today = new Date();
+      const lastWeek = new Date();
+      lastWeek.setDate(today.getDate() - 7);
+      
+      setStartDate(lastWeek.toISOString().split('T')[0]);
+      setEndDate(today.toISOString().split('T')[0]);
+    }
   };
 
-  // Loading state
-  if (productsLoading || salesLoading) {
+  // Loading state for initial page load
+  if (productsLoading || salesLoading || isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <RiLoader4Line className="animate-spin text-primary-500 w-10 h-10" />
@@ -341,9 +435,19 @@ export const Reports = () => {
     );
   }
 
-  // Render the dairy statistics section
-  const renderDairyStats = () => {
-    if (dairyStats.isLoading) {
+  // Render the report content based on selected type
+  const renderReportContent = () => {
+    // Show error if there's one
+    if (error) {
+      return (
+        <div className="text-red-500 p-4 text-center card">
+          {error}
+        </div>
+      );
+    }
+    
+    // Show loading if loading
+    if (isLoading) {
       return (
         <div className="flex justify-center items-center h-40">
           <RiLoader4Line className="animate-spin text-primary-500 w-10 h-10" />
@@ -351,20 +455,31 @@ export const Reports = () => {
       );
     }
 
-    if (dairyStats.error) {
-      return (
-        <div className="text-red-500 p-4 text-center">
-          {dairyStats.error}
-        </div>
-      );
+    // Render the appropriate report content based on type
+    switch (reportType) {
+      case 'dairy':
+        return renderDairyStats();
+      case 'sales':
+        return renderSalesStats();
+      case 'inventory':
+        return renderInventoryStats();
+      case 'financial':
+        return renderFinancialStats();
+      case 'audit':
+        return renderAuditStats();
+      default:
+        return renderDairyStats();
     }
-
+  };
+  
+  // Render dairy statistics
+  const renderDairyStats = () => {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium text-white">Dairy Products - Daily Report</h3>
           <button 
-            onClick={handleRefreshDairyData}
+            onClick={() => fetchReportData('dairy')}
             className="text-primary-500 hover:text-primary-400 flex items-center"
           >
             <RiRefreshLine className="mr-1" />
@@ -413,7 +528,277 @@ export const Reports = () => {
       </div>
     );
   };
-
+  
+  // Render sales statistics
+  const renderSalesStats = () => {
+    if (!reportData || !reportData.analytics) {
+      return (
+        <div className="text-gray-400 p-4 text-center">
+          No sales data available for the selected period.
+        </div>
+      );
+    }
+    
+    const { analytics, total_stats } = reportData;
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium text-white">Sales Report</h3>
+          <button 
+            onClick={() => fetchReportData('sales')}
+            className="text-primary-500 hover:text-primary-400 flex items-center"
+          >
+            <RiRefreshLine className="mr-1" />
+            Refresh
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="card p-4">
+            <h4 className="text-md font-medium text-white">Total Revenue</h4>
+            <p className="text-2xl font-bold text-primary-500 mt-2">
+              Ksh {total_stats?.revenue?.toLocaleString() || '0'}
+            </p>
+          </div>
+          
+          <div className="card p-4">
+            <h4 className="text-md font-medium text-white">Total Transactions</h4>
+            <p className="text-2xl font-bold text-primary-500 mt-2">
+              {total_stats?.count?.toLocaleString() || '0'}
+            </p>
+          </div>
+          
+          <div className="card p-4">
+            <h4 className="text-md font-medium text-white">Avg. Transaction</h4>
+            <p className="text-2xl font-bold text-primary-500 mt-2">
+              Ksh {total_stats?.count ? (total_stats.revenue / total_stats.count).toFixed(2) : '0.00'}
+            </p>
+          </div>
+        </div>
+        
+        {/* Sales by Date/Period Table */}
+        <div className="card p-4">
+          <h4 className="text-md font-medium text-white mb-4">Sales by Date</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-dark-700">
+                  <th className="py-2 px-4 text-left text-gray-400">Date</th>
+                  <th className="py-2 px-4 text-right text-gray-400">Transactions</th>
+                  <th className="py-2 px-4 text-right text-gray-400">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.map((item: any, index: number) => (
+                  <tr key={index} className="border-b border-dark-700">
+                    <td className="py-2 px-4 text-white">
+                      {item.date || new Date(item.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="py-2 px-4 text-right text-white">
+                      {item.count || item.transaction_count || '1'}
+                    </td>
+                    <td className="py-2 px-4 text-right text-white">
+                      Ksh {(item.total_revenue || item.revenue || 0).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Render inventory statistics
+  const renderInventoryStats = () => {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium text-white">Inventory Report</h3>
+          <button 
+            onClick={() => fetchReportData('inventory')}
+            className="text-primary-500 hover:text-primary-400 flex items-center"
+          >
+            <RiRefreshLine className="mr-1" />
+            Refresh
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="card p-4">
+            <h4 className="text-md font-medium text-white">Total Products</h4>
+            <p className="text-2xl font-bold text-primary-500 mt-2">
+              {products.length}
+            </p>
+          </div>
+          
+          <div className="card p-4">
+            <h4 className="text-md font-medium text-white">Inventory Value</h4>
+            <p className="text-2xl font-bold text-primary-500 mt-2">
+              Ksh {inventoryValue.toLocaleString()}
+            </p>
+          </div>
+          
+          <div className="card p-4">
+            <h4 className="text-md font-medium text-white">Low Stock Items</h4>
+            <p className="text-2xl font-bold text-primary-500 mt-2">
+              {lowStockItems.length} items
+            </p>
+          </div>
+        </div>
+        
+        {/* Inventory Items Table */}
+        <div className="card p-4">
+          <h4 className="text-md font-medium text-white mb-4">Low Stock Items</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-dark-700">
+                  <th className="py-2 px-4 text-left text-gray-400">Product</th>
+                  <th className="py-2 px-4 text-right text-gray-400">Current Stock</th>
+                  <th className="py-2 px-4 text-right text-gray-400">Value</th>
+                  <th className="py-2 px-4 text-right text-gray-400">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lowStockItems.slice(0, 10).map((product: Product) => (
+                  <tr key={product.id} className="border-b border-dark-700">
+                    <td className="py-2 px-4 text-white">{product.name}</td>
+                    <td className="py-2 px-4 text-right text-white">{product.quantity}</td>
+                    <td className="py-2 px-4 text-right text-white">
+                      Ksh {(product.quantity * Number(product.unit_price)).toLocaleString()}
+                    </td>
+                    <td className="py-2 px-4 text-right">
+                      <span className="px-2 py-1 text-xs rounded-full bg-red-500/20 text-red-400">
+                        Low Stock
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Render financial statistics
+  const renderFinancialStats = () => {
+    if (!reportData || !reportData.analytics) {
+      return (
+        <div className="text-gray-400 p-4 text-center">
+          No financial data available for the selected period.
+        </div>
+      );
+    }
+    
+    const { analytics, total_stats } = reportData;
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium text-white">Financial Report</h3>
+          <button 
+            onClick={() => fetchReportData('financial')}
+            className="text-primary-500 hover:text-primary-400 flex items-center"
+          >
+            <RiRefreshLine className="mr-1" />
+            Refresh
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="card p-4">
+            <h4 className="text-md font-medium text-white">Total Revenue</h4>
+            <p className="text-2xl font-bold text-primary-500 mt-2">
+              Ksh {total_stats?.revenue?.toLocaleString() || '0'}
+            </p>
+          </div>
+          
+          <div className="card p-4">
+            <h4 className="text-md font-medium text-white">Total Cost</h4>
+            <p className="text-2xl font-bold text-primary-500 mt-2">
+              Ksh {total_stats?.cost?.toLocaleString() || '0'}
+            </p>
+          </div>
+          
+          <div className="card p-4">
+            <h4 className="text-md font-medium text-white">Total Profit</h4>
+            <p className="text-2xl font-bold text-primary-500 mt-2">
+              Ksh {total_stats?.profit?.toLocaleString() || '0'}
+            </p>
+          </div>
+        </div>
+        
+        {/* Payment Methods Table */}
+        <div className="card p-4">
+          <h4 className="text-md font-medium text-white mb-4">Sales by Payment Method</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-dark-700">
+                  <th className="py-2 px-4 text-left text-gray-400">Payment Method</th>
+                  <th className="py-2 px-4 text-right text-gray-400">Transactions</th>
+                  <th className="py-2 px-4 text-right text-gray-400">Revenue</th>
+                  <th className="py-2 px-4 text-right text-gray-400">% of Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.map((item: any, index: number) => {
+                  const percentage = total_stats?.revenue 
+                    ? ((item.total_revenue / total_stats.revenue) * 100).toFixed(1) 
+                    : '0';
+                    
+                  return (
+                    <tr key={index} className="border-b border-dark-700">
+                      <td className="py-2 px-4 text-white capitalize">
+                        {item.payment_method || 'Unknown'}
+                      </td>
+                      <td className="py-2 px-4 text-right text-white">
+                        {item.count || item.transaction_count || '0'}
+                      </td>
+                      <td className="py-2 px-4 text-right text-white">
+                        Ksh {(item.total_revenue || item.revenue || 0).toLocaleString()}
+                      </td>
+                      <td className="py-2 px-4 text-right text-white">
+                        {percentage}%
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Render audit statistics
+  const renderAuditStats = () => {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium text-white">Audit Report</h3>
+          <button 
+            onClick={() => fetchReportData('audit')}
+            className="text-primary-500 hover:text-primary-400 flex items-center"
+          >
+            <RiRefreshLine className="mr-1" />
+            Refresh
+          </button>
+        </div>
+        
+        <div className="card p-4 text-center text-gray-400">
+          <p>Audit functionality is under development.</p>
+          <p>Please check back later for detailed activity logs.</p>
+        </div>
+      </div>
+    );
+  };
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -467,13 +852,14 @@ export const Reports = () => {
         </div>
       </div>
 
+      {/* Report Type & Time Selection */}
       <div className="bg-dark-800 rounded-lg p-4 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
+        <div className="flex flex-col md:flex-row md:space-x-4 mb-4">
           <div className="flex-1">
             <select 
               className="input-field w-full"
               value={reportType}
-              onChange={(e) => setReportType(e.target.value)}
+              onChange={(e) => handleReportTypeChange(e.target.value)}
             >
               <option value="">Select Report Type</option>
               {reportTypes.map((type) => (
@@ -483,36 +869,73 @@ export const Reports = () => {
               ))}
             </select>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="relative">
+        </div>
+        
+        <div className="flex flex-col md:flex-row md:items-center">
+          <div className="flex-1 flex space-x-2 mb-4 md:mb-0">
+            <button 
+              onClick={() => handleTimePeriodChange(1)}
+              className={`btn-sm flex-1 ${timePeriod === 1 && !isCustomDate ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              Today
+            </button>
+            <button 
+              onClick={() => handleTimePeriodChange(7)}
+              className={`btn-sm flex-1 ${timePeriod === 7 && !isCustomDate ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              Week
+            </button>
+            <button 
+              onClick={() => handleTimePeriodChange(30)}
+              className={`btn-sm flex-1 ${timePeriod === 30 && !isCustomDate ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              Month
+            </button>
+            <button 
+              onClick={handleCustomDateToggle}
+              className={`btn-sm flex-1 ${isCustomDate ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              Custom
+            </button>
+          </div>
+        </div>
+        
+        {isCustomDate && (
+          <div className="flex items-center space-x-4 mt-4">
+            <div className="relative flex-1">
               <RiCalendarLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="date"
-                className="input-field pl-10"
+                className="input-field pl-10 w-full"
                 placeholder="Start Date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
               />
             </div>
-            <div className="relative">
+            <div className="relative flex-1">
               <RiCalendarLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="date"
-                className="input-field pl-10"
+                className="input-field pl-10 w-full"
                 placeholder="End Date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
-            <button className="btn-primary">Generate</button>
+            <button 
+              onClick={() => fetchReportData(reportType)}
+              className="btn-primary whitespace-nowrap"
+            >
+              Generate
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Dairy Reports Section */}
-      {reportType === 'dairy' && (
+      {/* Report Content Section */}
+      {reportType && (
         <div className="card p-6 mb-6">
-          {renderDairyStats()}
+          {renderReportContent()}
         </div>
       )}
 
@@ -524,7 +947,7 @@ export const Reports = () => {
               <p className="text-sm text-gray-400">Category-wise sales and profit analysis</p>
             </div>
             <button 
-              onClick={handleRefreshDairyData}
+              onClick={() => fetchReportData(reportType)}
               className="text-primary-500 hover:text-primary-400 flex items-center"
             >
               <RiRefreshLine className="mr-1" />
@@ -548,7 +971,12 @@ export const Reports = () => {
               </div>
             </div>
             <div className="mt-6 flex space-x-3">
-              <button className="btn-primary flex-1">Generate</button>
+              <button 
+                className="btn-primary flex-1"
+                onClick={() => handleReportTypeChange(type.id)}
+              >
+                Generate
+              </button>
               <button className="btn-secondary flex items-center justify-center">
                 <RiDownloadLine className="w-5 h-5" />
               </button>

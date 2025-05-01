@@ -69,8 +69,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('accessToken', access);
       localStorage.setItem('refreshToken', refresh);
       
-      // Set user in state
+      // Set user in state and ensure it's updated immediately
       setUser(userData);
+      
+      // Add a small delay to ensure state updates properly before redirection
       toast.success('Login successful');
       return true;
     } catch (error) {
