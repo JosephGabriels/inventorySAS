@@ -2,6 +2,11 @@
 # Exit on error
 set -o errexit
 
+# Debug information
+echo "Current working directory: $(pwd)"
+echo "Python version: $(python --version)"
+echo "Port: $PORT"
+
 # Apply database migrations
 echo "Applying database migrations..."
 python manage.py migrate
@@ -16,4 +21,12 @@ fi
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
-echo "Post-deployment tasks completed."
+# Create start script
+echo "Creating start script..."
+cat > start.sh << EOF
+#!/usr/bin/env bash
+gunicorn inventory.wsgi:application --bind 0.0.0.0:\$PORT --log-file -
+EOF
+chmod +x start.sh
+
+echo "Build completed."
