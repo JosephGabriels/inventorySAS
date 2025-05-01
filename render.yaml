@@ -28,6 +28,20 @@ services:
         sync: false # User will manually set this in the Render dashboard
     autoDeploy: true
 
+  # New Django web service
+  - type: web
+    name: inventory-system
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn inventory.wsgi:application -c gunicorn_config.py
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: DJANGO_SETTINGS_MODULE
+        value: inventory.settings_production
+
   # Frontend web service - for future use
   # - type: web
   #   name: inventory-frontend

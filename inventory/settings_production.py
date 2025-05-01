@@ -27,6 +27,9 @@ DATABASES = {
     )
 }
 
+# Port configuration
+PORT = int(os.getenv('PORT', '10000'))
+
 # Production security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
