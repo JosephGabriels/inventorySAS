@@ -30,9 +30,11 @@ export default defineConfig({
       },
     },
   },
-  base: '/assets/',
+  base: '/static/',
   build: {
-    outDir: 'dist', // Output inside frontend/
+    outDir: 'dist',
+    assetsDir: 'assets',
+    emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
       output: {
