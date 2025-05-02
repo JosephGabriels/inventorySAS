@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from datetime import timedelta
 from pathlib import Path
 import os
+import dj_database_url
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,22 +25,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-zmte4do7-j-+wv(864rug5uo3*x)p1tawr%Ksh pfj)h5=ek6dhmp'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'your-default-secret-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
-    'dpg-d08gg1adbo4c73acqrlg-a.oregon-postgres.render.com',
-    '.render.com',  # Allows all subdomains on render.com
-    'inventorysas-1.onrender.com',  # Replace with your actual Render app domain
+    '.onrender.com',
+    os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''),
 ]
 
 # Update CORS settings too
@@ -133,17 +132,10 @@ WSGI_APPLICATION = 'inventory.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
-        'OPTIONS': {
-            'sslmode': 'require'  # Required for Render PostgreSQL
-        }
-    }
+    'default': dj_database_url.config(
+        default='postgresql://postgres:postgres@localhost:5432/inventory',
+        conn_max_age=600
+    )
 }
 
 CORS_ALLOW_CREDENTIALS = True
@@ -161,8 +153,9 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # Static files
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]

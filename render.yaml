@@ -28,19 +28,30 @@ services:
         sync: false # User will manually set this in the Render dashboard
     autoDeploy: true
 
-  # New Django web service
+  # Updated Django web service
   - type: web
     name: inventory-system
     env: python
-    buildCommand: pip install -r requirements.txt
+    plan: free
+    buildCommand: ./build.sh
     startCommand: gunicorn inventory.wsgi:application -c gunicorn_config.py
     envVars:
-      - key: PORT
-        value: 10000
       - key: PYTHON_VERSION
         value: 3.9.0
-      - key: DJANGO_SETTINGS_MODULE
-        value: inventory.settings_production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: inventory_db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DJANGO_SUPERUSER_USERNAME
+        value: admin
+      - key: DJANGO_SUPERUSER_PASSWORD
+        generateValue: true
+      - key: DJANGO_SUPERUSER_EMAIL
+        value: admin@example.com
 
   # Frontend web service - for future use
   # - type: web
@@ -61,3 +72,8 @@ services:
 # The database is already created in Render.com
 # Use environment variables to connect to the existing database
 # DATABASE_URL should be set to: postgresql://josephgabriels:PASSWORD@dpg-d08gg1adbo4c73acqrlg-a.oregon-postgres.render.com/inventory_db_0q4l
+
+databases:
+  - name: inventory_db
+    plan: free
+    databaseName: inventory
