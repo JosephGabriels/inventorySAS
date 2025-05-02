@@ -4,8 +4,14 @@ services:
     name: inventory-backend
     env: python
     plan: free
-    buildCommand: ./build.sh
-    startCommand: gunicorn inventory.wsgi:application --bind=0.0.0.0:$PORT -c gunicorn_config.py
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+      cd frontend
+      npm install
+      npm run build
+      cd ..
+    startCommand: gunicorn inventory.wsgi:application --bind=0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
@@ -27,27 +33,12 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false # User will manually set this in the Render dashboard
-
-  # Frontend service
-  - type: web
-    name: inventory-frontend
-    env: node
-    plan: free
-    buildCommand: |
-      cd frontend
-      npm install
-      npm run build
-    startCommand: |
-      cd frontend
-      npm run preview -- --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: NODE_VERSION
-        value: 18
-      - key: VITE_API_URL
-        fromService:
-          name: inventory-backend
-          type: web
-          property: url
+      - key: STATIC_URL
+        value: /static/
+      - key: STATIC_ROOT
+        value: staticfiles
+      - key: DISABLE_COLLECTSTATIC
+        value: 0
 
 databases:
   - name: inventory_db
