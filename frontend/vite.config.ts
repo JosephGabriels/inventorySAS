@@ -30,7 +30,7 @@ export default defineConfig({
       },
     },
   },
-  base: '/',
+  base: '/static/',
   build: {
     outDir: 'dist', // Output inside frontend/
     sourcemap: true,
