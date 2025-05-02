@@ -31,12 +31,10 @@ export default defineConfig({
       },
     },
   },
+  base: '/',
   build: {
     outDir: 'dist',
     sourcemap: true,
-    typescript: {
-      ignoreBuildErrors: true,
-    },
     rollupOptions: {
       output: {
         manualChunks: {
@@ -45,6 +43,9 @@ export default defineConfig({
           query: ['@tanstack/react-query'],
         },
       },
+    },
+    typescript: {
+      ignoreBuildErrors: true,
     },
   },
 })
