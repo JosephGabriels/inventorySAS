@@ -7,6 +7,7 @@ import {
 } from 'react-icons/ri'
 import { fetchUsers, createUser, updateUser, deleteUser, UserData } from '../../services/api'
 import toast from 'react-hot-toast'
+import { RegisterData } from '@/types';
 
 interface UserManagementSectionProps {
   currentUser: UserData | null
@@ -58,6 +59,19 @@ export const UserManagementSection = ({ currentUser }: UserManagementSectionProp
       toast.error(selectedUser ? 'Failed to update user' : 'Failed to create user')
     }
   }
+
+  const handleCreateUser = async (data: Omit<RegisterData, 'password_confirm'>) => {
+    try {
+      await userAPI.register({
+        ...data,
+        role: data.is_admin ? 'admin' : 'user'
+      });
+      toast.success('User created successfully');
+      loadUsers();
+    } catch (error) {
+      toast.error('Failed to create user');
+    }
+  };
 
   const handleDelete = async (userId: number) => {
     if (userId === currentUser?.id) {

@@ -1,6 +1,7 @@
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import type { Product } from '../hooks/useProducts'
+import { CategoryFormData, StockMovement } from '../types'
 
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -289,15 +290,11 @@ export const categoryAPI = {
     return response.data
   },
   
-  create: async (data: CategoryFormData) => {
-    const response = await api.post('/api/categories/', data)
-    return response.data
-  },
+  create: (data: CategoryFormData) => 
+    api.post('/api/categories/', data),
   
-  update: async (id: number, data: CategoryFormData) => {
-    const response = await api.put(`/api/categories/${id}/`, data)
-    return response.data
-  },
+  update: (id: number, data: CategoryFormData) =>
+    api.put(`/api/categories/${id}/`, data),
   
   delete: async (id: number) => {
     await api.delete(`/api/categories/${id}/`)

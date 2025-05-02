@@ -1,10 +1,11 @@
 services:
-  # Django web service
+  # Django backend service
   - type: web
     name: inventory-backend
     env: python
-    buildCommand: pip install -r requirements.txt && chmod +x build.sh && ./build.sh
-    startCommand: gunicorn inventory.wsgi:application
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: gunicorn inventory.wsgi:application --bind=0.0.0.0:$PORT -c gunicorn_config.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
@@ -26,53 +27,27 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false # User will manually set this in the Render dashboard
-    autoDeploy: true
 
-  # Updated Django web service
+  # Frontend service
   - type: web
-    name: inventory-system
-    env: python
+    name: inventory-frontend
+    env: node
     plan: free
-    buildCommand: ./build.sh
-    # Explicitly specify port in start command
-    startCommand: gunicorn inventory.wsgi:application --bind=0.0.0.0:$PORT -c gunicorn_config.py
+    buildCommand: |
+      cd frontend
+      npm install
+      npm run build
+    startCommand: |
+      cd frontend
+      npm run preview -- --host 0.0.0.0 --port $PORT
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.9.0
-      - key: PORT
-        value: 10000
-      - key: DATABASE_URL
-        fromDatabase:
-          name: inventory_db
-          property: connectionString
-      - key: SECRET_KEY
-        generateValue: true
-      - key: DJANGO_SUPERUSER_USERNAME
-        value: admin
-      - key: DJANGO_SUPERUSER_PASSWORD
-        generateValue: true
-      - key: DJANGO_SUPERUSER_EMAIL
-        value: admin@example.com
-
-  # Frontend web service - for future use
-  # - type: web
-  #   name: inventory-frontend
-  #   env: node
-  #   buildCommand: cd frontend && npm ci && npm run build
-  #   startCommand: cd frontend && npm run preview
-  #   envVars:
-  #     - key: NODE_VERSION
-  #       value: 18
-  #     - key: VITE_API_URL
-  #       fromService:
-  #         name: inventory-backend
-  #         type: web
-  #         property: url
-  #   autoDeploy: true
-
-# The database is already created in Render.com
-# Use environment variables to connect to the existing database
-# DATABASE_URL should be set to: postgresql://josephgabriels:PASSWORD@dpg-d08gg1adbo4c73acqrlg-a.oregon-postgres.render.com/inventory_db_0q4l
+      - key: NODE_VERSION
+        value: 18
+      - key: VITE_API_URL
+        fromService:
+          name: inventory-backend
+          type: web
+          property: url
 
 databases:
   - name: inventory_db
