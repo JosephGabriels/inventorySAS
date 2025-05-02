@@ -17,6 +17,10 @@ if [[ -n "$DJANGO_SUPERUSER_USERNAME" && -n "$DJANGO_SUPERUSER_EMAIL" && -n "$DJ
   python manage.py createsuperuser --noinput
 fi
 
+# Build frontend assets
+echo "Building frontend assets..."
+cd frontend && npm ci && npm run build && cd ..
+
 # Collect static files
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
