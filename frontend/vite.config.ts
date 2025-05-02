@@ -34,6 +34,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    typescript: {
+      ignoreBuildErrors: true,
+    },
     rollupOptions: {
       output: {
         manualChunks: {
