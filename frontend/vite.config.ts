@@ -18,24 +18,13 @@ export default defineConfig({
       '@types': path.resolve(__dirname, './src/types'),
     },
   },
-  server: {
-    proxy: {
-      '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
-        changeOrigin: true,
-      },
-      '/media': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
-        changeOrigin: true,
-      },
-    },
-  },
   base: '/static/',
   build: {
-    outDir: 'dist',
+    outDir: 'dist',  // Changed back to dist for safer builds
     assetsDir: 'assets',
     emptyOutDir: true,
     sourcemap: true,
+    manifest: true,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -43,7 +32,36 @@ export default defineConfig({
           router: ['react-router-dom'],
           query: ['@tanstack/react-query'],
         },
+        // Add asset naming pattern
+        assetFileNames: (assetInfo) => {
+          let extType = assetInfo.name.split('.').at(1);
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(extType)) {
+            extType = 'img';
+          }
+          return `assets/${extType}/[name]-[hash][extname]`;
+        },
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
       },
     }
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/media': {
+        target: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/static': {
+        target: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      }
+    },
   },
 })
