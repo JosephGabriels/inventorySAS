@@ -30,7 +30,7 @@ export default defineConfig({
       },
     },
   },
-  base: '/static/',
+  base: '',
   build: {
     outDir: 'dist', // Output inside frontend/
     sourcemap: true,
@@ -42,9 +42,6 @@ export default defineConfig({
           query: ['@tanstack/react-query'],
         },
       },
-    },
-    typescript: {
-      ignoreBuildErrors: true,
-    },
+    }
   },
 })
