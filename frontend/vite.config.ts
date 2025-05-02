@@ -19,21 +19,20 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
       '/media': {
-        target: 'http://localhost:8000',
+        target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
     },
   },
   base: '/',
   build: {
-    outDir: 'dist',
+    outDir: '../staticfiles', // Change output directory
     sourcemap: true,
     rollupOptions: {
       output: {
