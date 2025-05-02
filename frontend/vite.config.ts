@@ -32,7 +32,7 @@ export default defineConfig({
   },
   base: '/',
   build: {
-    outDir: '../staticfiles', // Change output directory
+    outDir: 'dist', // Output inside frontend/
     sourcemap: true,
     rollupOptions: {
       output: {
