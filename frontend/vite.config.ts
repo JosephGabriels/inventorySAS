@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -20,7 +19,7 @@ export default defineConfig({
   },
   base: '/static/',
   build: {
-    outDir: 'dist',  // Changed back to dist for safer builds
+    outDir: 'dist',
     assetsDir: 'assets',
     emptyOutDir: true,
     sourcemap: true,
@@ -32,13 +31,16 @@ export default defineConfig({
           router: ['react-router-dom'],
           query: ['@tanstack/react-query'],
         },
-        // Add asset naming pattern
         assetFileNames: (assetInfo) => {
-          let extType = assetInfo.name.split('.').at(1);
-          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(extType)) {
-            extType = 'img';
+          if (!assetInfo.name) return 'assets/[name]-[hash][extname]';
+          const ext = assetInfo.name.split('.').pop() || '';
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
+            return 'assets/img/[name]-[hash][extname]';
           }
-          return `assets/${extType}/[name]-[hash][extname]`;
+          if (ext === 'css') {
+            return 'assets/css/[name]-[hash][extname]';
+          }
+          return 'assets/[name]-[hash][extname]';
         },
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
@@ -46,21 +48,17 @@ export default defineConfig({
     }
   },
   server: {
+    port: 3000,
     proxy: {
       '/api': {
-        target: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+        target: 'https://inventorysas.onrender.com',
         changeOrigin: true,
-        secure: false,
+        secure: true,
       },
       '/media': {
-        target: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+        target: 'https://inventorysas.onrender.com',
         changeOrigin: true,
-        secure: false,
-      },
-      '/static': {
-        target: import.meta.env.VITE_API_URL || 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
+        secure: true,
       }
     },
   },
