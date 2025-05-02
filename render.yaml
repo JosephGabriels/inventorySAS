@@ -34,7 +34,8 @@ services:
     env: python
     plan: free
     buildCommand: ./build.sh
-    startCommand: gunicorn inventory.wsgi:application -c gunicorn_config.py
+    # Explicitly specify port in start command
+    startCommand: gunicorn inventory.wsgi:application --bind=0.0.0.0:$PORT -c gunicorn_config.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
