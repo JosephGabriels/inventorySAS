@@ -43,11 +43,8 @@ ALLOWED_HOSTS = [
 
 # Update CORS settings too
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-    "https://inventorysas-1.onrender.com",  # Add your frontend domain
+    "https://inventorysas.onrender.com",
+    # ...other origins...
 ]
 
 # Application definition
