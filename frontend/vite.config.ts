@@ -42,14 +42,7 @@ export default defineConfig({
           }
           return 'assets/[name]-[hash][extname]';
         },
-        chunkFileNames: (chunkInfo) => {
-          const name = chunkInfo.name;
-          // Handle index.js specially
-          if (name.includes('index')) {
-            return 'assets/js/main-[hash].js';
-          }
-          return 'assets/js/[name]-[hash].js';
-        },
+        chunkFileNames: 'assets/js/[name]-[hash].js',  // Simplified chunk naming
         entryFileNames: 'assets/js/[name]-[hash].js',
       },
     }
