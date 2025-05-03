@@ -17,12 +17,12 @@ export default defineConfig({
       '@types': path.resolve(__dirname, './src/types'),
     },
   },
-  base: '/static/',  // Changed back to /static/ to match Django's static URL
+  base: '/static/',
   build: {
     outDir: 'dist',
-    assetsDir: 'assets',  // Remove static prefix as it's handled by base
+    assetsDir: 'assets',
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: false,  // Changed to false to reduce file size
     manifest: true,
     rollupOptions: {
       output: {
@@ -42,7 +42,14 @@ export default defineConfig({
           }
           return 'assets/[name]-[hash][extname]';
         },
-        chunkFileNames: 'assets/js/[name]-[hash].js',
+        chunkFileNames: (chunkInfo) => {
+          const name = chunkInfo.name;
+          // Handle index.js specially
+          if (name.includes('index')) {
+            return 'assets/js/main-[hash].js';
+          }
+          return 'assets/js/[name]-[hash].js';
+        },
         entryFileNames: 'assets/js/[name]-[hash].js',
       },
     }
@@ -56,11 +63,6 @@ export default defineConfig({
         secure: true,
       },
       '/media': {
-        target: 'https://inventorysas.onrender.com',
-        changeOrigin: true,
-        secure: true,
-      },
-      '/static': {
         target: 'https://inventorysas.onrender.com',
         changeOrigin: true,
         secure: true,
