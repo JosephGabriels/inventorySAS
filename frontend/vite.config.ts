@@ -32,18 +32,17 @@ export default defineConfig({
           query: ['@tanstack/react-query'],
         },
         assetFileNames: (assetInfo) => {
-          if (!assetInfo.name) return 'assets/[name]-[hash][extname]';
-          const ext = assetInfo.name.split('.').pop() || '';
+          const ext = assetInfo.name?.split('.').pop() || '';
           if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
-            return 'assets/img/[name]-[hash][extname]';
+            return 'assets/img/[name].[hash][extname]';
           }
           if (ext === 'css') {
-            return 'assets/css/[name]-[hash][extname]';
+            return 'assets/css/[name].[hash][extname]';
           }
-          return 'assets/[name]-[hash][extname]';
+          return 'assets/[name].[hash][extname]';
         },
-        chunkFileNames: 'assets/js/[name]-[hash].js',  // Simplified chunk naming
-        entryFileNames: 'assets/js/[name]-[hash].js',
+        chunkFileNames: 'assets/js/[name].[hash].js',
+        entryFileNames: 'assets/js/[name].[hash].js',
       },
     }
   },
