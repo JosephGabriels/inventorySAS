@@ -17,10 +17,10 @@ export default defineConfig({
       '@types': path.resolve(__dirname, './src/types'),
     },
   },
-  base: '/static/',
+  base: '/', // Changed from /static/
   build: {
     outDir: 'dist',
-    assetsDir: 'assets',
+    assetsDir: 'static/assets', // Changed to include static prefix
     emptyOutDir: true,
     sourcemap: true,
     manifest: true,
@@ -32,18 +32,18 @@ export default defineConfig({
           query: ['@tanstack/react-query'],
         },
         assetFileNames: (assetInfo) => {
-          if (!assetInfo.name) return 'assets/[name]-[hash][extname]';
+          if (!assetInfo.name) return 'static/assets/[name]-[hash][extname]';
           const ext = assetInfo.name.split('.').pop() || '';
           if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
-            return 'assets/img/[name]-[hash][extname]';
+            return 'static/assets/img/[name]-[hash][extname]';
           }
           if (ext === 'css') {
-            return 'assets/css/[name]-[hash][extname]';
+            return 'static/assets/css/[name]-[hash][extname]';
           }
-          return 'assets/[name]-[hash][extname]';
+          return 'static/assets/[name]-[hash][extname]';
         },
-        chunkFileNames: 'assets/js/[name]-[hash].js',
-        entryFileNames: 'assets/js/[name]-[hash].js',
+        chunkFileNames: 'static/assets/js/[name]-[hash].js',
+        entryFileNames: 'static/assets/js/[name]-[hash].js',
       },
     }
   },
