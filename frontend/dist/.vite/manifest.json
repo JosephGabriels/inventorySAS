@@ -1,6 +1,6 @@
 {
   "_query-DHPQOrIn.js": {
-    "file": "static/assets/js/query-DHPQOrIn.js",
+    "file": "assets/js/query-DHPQOrIn.js",
     "name": "query",
     "imports": [
       "_router-Ch53ggU4.js",
@@ -8,18 +8,18 @@
     ]
   },
   "_react-DeqkGhWy.js": {
-    "file": "static/assets/js/react-DeqkGhWy.js",
+    "file": "assets/js/react-DeqkGhWy.js",
     "name": "react"
   },
   "_router-Ch53ggU4.js": {
-    "file": "static/assets/js/router-Ch53ggU4.js",
+    "file": "assets/js/router-Ch53ggU4.js",
     "name": "router",
     "imports": [
       "_react-DeqkGhWy.js"
     ]
   },
   "index.html": {
-    "file": "static/assets/js/index-C9Ma5SJn.js",
+    "file": "assets/js/index-LSAgGcHz.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -29,7 +29,7 @@
       "_react-DeqkGhWy.js"
     ],
     "css": [
-      "static/assets/css/index-BjpEUWd-.css"
+      "assets/css/index-BjpEUWd-.css"
     ]
   }
 }
