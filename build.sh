@@ -19,6 +19,9 @@ fi
 
 # Build frontend assets
 echo "Building frontend assets..."
+echo "Cleaning up..."
+rm -rf frontend/dist
+rm -rf staticfiles/*
 cd frontend && npm ci && npm run build && cd ..
 
 # Collect static files
