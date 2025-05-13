@@ -620,14 +620,49 @@ export const userAPI = {
 };
 
 // Add dairy API endpoints
+interface DairyStats {
+  total_stats: {
+    total_sales: number;
+    total_revenue: number;
+    total_profit: number;
+    date: string;
+  };
+  categories_used: Array<{
+    category: string;
+    count: number;
+  }>;
+  product_count: number;
+  message?: string;
+  dairy_products: Array<{
+    name: string;
+    quantity: number;
+    revenue: number;
+    date: string;
+  }>;
+}
+
 export const dairyAPI = {
-  getStats: async (days: number = 1) => {
+  getStats: async (days: number = 1): Promise<DairyStats | null> => {
     try {
-      // Add leading slash and ensure trailing slash
-      const response = await api.get('/api/dairy/stats/', {
+      const response = await api.get<DairyStats>('/api/dairy/stats/', {
         params: { days }
       });
-      return response.data;
+      
+      // Ensure dates are properly formatted
+      if (response.data) {
+        return {
+          ...response.data,
+          total_stats: {
+            ...response.data.total_stats,
+            date: new Date(response.data.total_stats.date).toISOString()
+          },
+          dairy_products: response.data.dairy_products.map(product => ({
+            ...product,
+            date: new Date(product.date).toISOString()
+          }))
+        };
+      }
+      return null;
     } catch (error: any) {
       console.error('Error fetching dairy stats:', error);
       if (error.response?.status === 404) {
@@ -639,22 +674,8 @@ export const dairyAPI = {
     }
   },
 
-  getAnalytics: async (days: number = 1) => {
-    try {
-      // Add leading slash and ensure trailing slash
-      const response = await api.get('/api/dairy/stats/', {
-        params: { days }
-      });
-      return response.data;
-    } catch (error: any) {
-      console.error('Error fetching dairy analytics:', error);
-      if (error.response?.status === 404) {
-        toast.error('Dairy analytics endpoint not found');
-      } else {
-        toast.error('Failed to fetch dairy analytics');
-      }
-      return null;
-    }
+  getAnalytics: async (days: number = 1): Promise<DairyStats | null> => {
+    return dairyAPI.getStats(days);
   }
 };
 
