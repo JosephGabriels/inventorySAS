@@ -562,16 +562,26 @@ export const PointOfSale = () => {
                   <div className="flex items-center space-x-2">
                     {/* Quantity Input */}
                     <input
-                      type="number"
-                      min="1"
-                      max={item.product.quantity}
+                      type="text" // Change from type="number" to type="text"
                       value={item.quantity}
                       onChange={(e) => {
-                        const newQuantity = parseInt(e.target.value) || 1;
-                        updateCartItemQuantity(
-                          item.product.id,
-                          Math.min(newQuantity, item.product.quantity)
-                        );
+                        const value = e.target.value;
+                        // Allow empty string or valid numbers
+                        if (value === '' || /^\d+$/.test(value)) {
+                          const newQuantity = value === '' ? 1 : parseInt(value);
+                          // Validate against stock limit
+                          if (newQuantity <= item.product.quantity) {
+                            updateCartItemQuantity(item.product.id, newQuantity);
+                          } else {
+                            toast.error(`Only ${item.product.quantity} units available in stock`);
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Ensure minimum value of 1 when input loses focus
+                        if (e.target.value === '' || parseInt(e.target.value) < 1) {
+                          updateCartItemQuantity(item.product.id, 1);
+                        }
                       }}
                       className="w-20 h-8 bg-[#2f394b] text-white text-center rounded-lg border border-[#1a2133]
                         focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50"
@@ -579,13 +589,25 @@ export const PointOfSale = () => {
                     
                     {/* Price Input */}
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="text" // Change from type="number" to type="text"
                       value={item.discountedPrice || item.product.unit_price}
                       onChange={(e) => {
-                        const newPrice = parseFloat(e.target.value);
-                        updateCartItemPrice(item.product.id, newPrice);
+                        const value = e.target.value;
+                        // Allow empty string, numbers, and decimal points
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          const newPrice = value === '' ? 0 : parseFloat(value);
+                          updateCartItemPrice(item.product.id, newPrice);
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Format price to 2 decimal places when input loses focus
+                        const value = e.target.value;
+                        if (value === '') {
+                          updateCartItemPrice(item.product.id, item.product.unit_price);
+                        } else {
+                          const formattedPrice = parseFloat(value).toFixed(2);
+                          updateCartItemPrice(item.product.id, parseFloat(formattedPrice));
+                        }
                       }}
                       className="w-24 h-8 bg-[#2f394b] text-white text-center rounded-lg border border-[#1a2133]
                         focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50"
