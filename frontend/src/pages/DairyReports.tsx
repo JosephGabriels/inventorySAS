@@ -129,10 +129,11 @@ export const DairyReports = () => {
     
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Total Sales Card */}
         <div className="card p-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium text-white">Total Sales</h3>
-            <span className="text-primary-500">Dairy</span>
+            <span className="text-primary-500">Revenue</span>
           </div>
           <p className="text-2xl font-bold text-primary-500 mt-2">
             Ksh {dairyStats.total_stats.revenue.toLocaleString()}
@@ -141,7 +142,104 @@ export const DairyReports = () => {
             {dairyStats.period.start_date} to {dairyStats.period.end_date}
           </p>
         </div>
-        {/* Add other stat cards similarly */}
+
+        {/* Total Profits Card */}
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-white">Total Profits</h3>
+            <span className="text-green-500">Net Profit</span>
+          </div>
+          <p className="text-2xl font-bold text-green-500 mt-2">
+            Ksh {dairyStats.total_stats.profit.toLocaleString()}
+          </p>
+          <p className="text-sm text-gray-400 mt-1">
+            Margin: {((dairyStats.total_stats.profit / dairyStats.total_stats.revenue) * 100).toFixed(1)}%
+          </p>
+        </div>
+
+        {/* Items Sold Card */}
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-white">Items Sold</h3>
+            <span className="text-blue-500">Quantity</span>
+          </div>
+          <p className="text-2xl font-bold text-blue-500 mt-2">
+            {dairyStats.total_stats.quantity.toLocaleString()} units
+          </p>
+          <p className="text-sm text-gray-400 mt-1">
+            Avg. {(dairyStats.total_stats.quantity / dairyStats.period.days).toFixed(0)} per day
+          </p>
+        </div>
+
+        {/* Stock Value Card */}
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-white">Stock Value</h3>
+            <span className="text-yellow-500">Inventory</span>
+          </div>
+          <p className="text-2xl font-bold text-yellow-500 mt-2">
+            Ksh {dairyStats.total_stats.cost.toLocaleString()}
+          </p>
+          <p className="text-sm text-gray-400 mt-1">
+            Cost of Goods Sold
+          </p>
+        </div>
+
+        {/* Average Transaction Value */}
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-white">Avg. Transaction</h3>
+            <span className="text-purple-500">Per Sale</span>
+          </div>
+          <p className="text-2xl font-bold text-purple-500 mt-2">
+            Ksh {(dairyStats.total_stats.revenue / dairyStats.total_stats.quantity).toFixed(2)}
+          </p>
+          <p className="text-sm text-gray-400 mt-1">
+            Per Unit Revenue
+          </p>
+        </div>
+
+        {/* Profit per Unit */}
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-white">Unit Profit</h3>
+            <span className="text-emerald-500">Per Item</span>
+          </div>
+          <p className="text-2xl font-bold text-emerald-500 mt-2">
+            Ksh {(dairyStats.total_stats.profit / dairyStats.total_stats.quantity).toFixed(2)}
+          </p>
+          <p className="text-sm text-gray-400 mt-1">
+            Average Profit per Unit
+          </p>
+        </div>
+
+        {/* Daily Revenue Trend */}
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-white">Daily Revenue</h3>
+            <span className="text-orange-500">Average</span>
+          </div>
+          <p className="text-2xl font-bold text-orange-500 mt-2">
+            Ksh {(dairyStats.total_stats.revenue / dairyStats.period.days).toFixed(2)}
+          </p>
+          <p className="text-sm text-gray-400 mt-1">
+            Per Day
+          </p>
+        </div>
+
+        {/* Category Distribution */}
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-white">Categories</h3>
+            <span className="text-pink-500">Diversity</span>
+          </div>
+          <p className="text-2xl font-bold text-pink-500 mt-2">
+            {dairyStats.categories_used.length}
+          </p>
+          <p className="text-sm text-gray-400 mt-1">
+            Active Product Categories
+          </p>
+        </div>
       </div>
     );
   };
