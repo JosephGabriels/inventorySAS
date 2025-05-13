@@ -49,8 +49,14 @@ interface Sale {
   payment_method: 'cash' | 'card' | 'mobile'
 }
 
+interface CartItem {
+  product: Product;
+  quantity: number;
+  discountedPrice?: number;  // Optional discounted price
+}
+
 export const PointOfSale = () => {
-  const [cart, setCart] = useState<Array<{ product: Product; quantity: number }>>([])
+  const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mobile'>('cash')
   const [isPdfReady, setIsPdfReady] = useState(false)
@@ -134,6 +140,21 @@ export const PointOfSale = () => {
       })
     })
   }
+
+  // Add a function to handle price updates
+  const updateCartItemPrice = (productId: number, newPrice: number) => {
+    setCart(prevCart => {
+      return prevCart.map(item => {
+        if (item.product.id === productId) {
+          return {
+            ...item,
+            discountedPrice: newPrice >= 0 ? newPrice : item.product.unit_price
+          };
+        }
+        return item;
+      });
+    });
+  };
 
   // Simple remove from cart
   const removeFromCart = (productId: number) => {
@@ -333,7 +354,7 @@ export const PointOfSale = () => {
     }
 
     const total = cart.reduce((sum, item) => 
-      sum + (item.product.unit_price * item.quantity), 0
+      sum + ((item.discountedPrice || item.product.unit_price) * item.quantity), 0
     );
     const vat = total * (16/116);
     const subtotal = total - vat;
@@ -361,7 +382,7 @@ export const PointOfSale = () => {
         items: cart.map(item => ({
           product_id: item.product.id,
           quantity: item.quantity,
-          unit_price: item.product.unit_price
+          unit_price: item.discountedPrice || item.product.unit_price
         })),
         total_amount: currentSale.totalAmount,
         payment_method: paymentMethod
@@ -426,7 +447,9 @@ export const PointOfSale = () => {
     )
   })
 
-  const cartTotal = cart.reduce((sum, item) => sum + (item.product.unit_price * item.quantity), 0);
+  const cartTotal = cart.reduce((sum, item) => 
+    sum + ((item.discountedPrice || item.product.unit_price) * item.quantity), 0
+  );
   const cartVat = cartTotal * (16 / 116); // Extract VAT from total
   const cartSubtotal = cartTotal - cartVat;
 
@@ -536,41 +559,52 @@ export const PointOfSale = () => {
                 </div>
                 
                 <div className="flex justify-between items-center mt-3">
-                  <div className="flex items-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateCartItemQuantity(item.product.id, item.quantity - 1);
+                  <div className="flex items-center space-x-2">
+                    {/* Quantity Input */}
+                    <input
+                      type="number"
+                      min="1"
+                      max={item.product.quantity}
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const newQuantity = parseInt(e.target.value) || 1;
+                        updateCartItemQuantity(
+                          item.product.id,
+                          Math.min(newQuantity, item.product.quantity)
+                        );
                       }}
-                      disabled={item.quantity <= 1}
-                      className="w-8 h-8 rounded-l-lg bg-[#343d52] text-white flex items-center justify-center hover:bg-orange-500 disabled:opacity-50 disabled:hover:bg-[#343d52] transition-colors"
-                    >
-                      <RiSubtractLine size={16} />
-                    </button>
+                      className="w-20 h-8 bg-[#2f394b] text-white text-center rounded-lg border border-[#1a2133]
+                        focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50"
+                    />
                     
-                    <div className="w-10 h-8 bg-[#2f394b] text-white flex items-center justify-center border-x border-[#1a2133]">
-                      {item.quantity}
-                    </div>
-                    
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateCartItemQuantity(item.product.id, item.quantity + 1);
+                    {/* Price Input */}
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.discountedPrice || item.product.unit_price}
+                      onChange={(e) => {
+                        const newPrice = parseFloat(e.target.value);
+                        updateCartItemPrice(item.product.id, newPrice);
                       }}
-                      disabled={item.quantity >= item.product.quantity}
-                      className="w-8 h-8 rounded-r-lg bg-[#343d52] text-white flex items-center justify-center hover:bg-orange-500 disabled:opacity-50 disabled:hover:bg-[#343d52] transition-colors"
-                    >
-                      <RiAddLine size={16} />
-                    </button>
+                      className="w-24 h-8 bg-[#2f394b] text-white text-center rounded-lg border border-[#1a2133]
+                        focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50"
+                    />
                   </div>
                   
                   <p className="text-white font-medium">
-                    Ksh {(item.quantity * item.product.unit_price).toLocaleString()}
+                    Ksh {((item.discountedPrice || item.product.unit_price) * item.quantity).toLocaleString()}
                   </p>
                 </div>
                 
-                <div className="mt-2 text-xs text-gray-400">
-                  Stock: {item.product.quantity} | Unit Price: Ksh {item.product.unit_price.toLocaleString()}
+                <div className="mt-2 text-xs text-gray-400 flex justify-between">
+                  <span>Stock: {item.product.quantity}</span>
+                  <span>Original Price: Ksh {item.product.unit_price.toLocaleString()}</span>
+                  {item.discountedPrice && item.discountedPrice < item.product.unit_price && (
+                    <span className="text-orange-400">
+                      Discount: {((1 - item.discountedPrice / item.product.unit_price) * 100).toFixed(0)}%
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -672,7 +706,7 @@ export const PointOfSale = () => {
                           {item.quantity}x {item.product.name}
                         </span>
                         <span className="text-gray-400">
-                          Ksh {(item.quantity * item.product.unit_price).toLocaleString()}
+                          Ksh {(item.quantity * (item.discountedPrice || item.product.unit_price)).toLocaleString()}
                         </span>
                       </div>
                     ))}
