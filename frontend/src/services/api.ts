@@ -3,7 +3,10 @@ import toast from 'react-hot-toast'
 import type { Product } from '../hooks/useProducts'
 import { CategoryFormData, StockMovement } from '../types'
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Update baseURL logic to handle production URLs
+const baseURL = import.meta.env.PROD 
+  ? 'https://inventorysas.onrender.com'  // Your production API URL
+  : import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 // Create an axios instance with the base URL
 const api = axios.create({
