@@ -3,18 +3,16 @@ services:
   - type: web
     name: inventory-backend
     env: python
-    plan: free
-    buildCommand: |
-      pip install -r requirements.txt
-      python manage.py collectstatic --noinput
-      cd frontend
-      npm install
-      npm run build
-      cd ..
-    startCommand: gunicorn inventory.wsgi:application --bind=0.0.0.0:$PORT
+    plan: standard
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn inventory.wsgi:application --bind=0.0.0.0:$PORT --workers=4 --threads=4 --timeout=30"
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: inventory_db
+          property: connectionString
       - key: PYTHON_VERSION
-        value: 3.10.0
+        value: 3.11.0
       - key: WEB_CONCURRENCY
         value: 4
       - key: DEBUG
@@ -31,8 +29,6 @@ services:
         sync: false
       - key: DJANGO_SUPERUSER_PASSWORD
         sync: false
-      - key: DATABASE_URL
-        sync: false # User will manually set this in the Render dashboard
       - key: STATIC_URL
         value: /static/
       - key: STATIC_ROOT
@@ -42,5 +38,12 @@ services:
 
 databases:
   - name: inventory_db
-    plan: free
-    databaseName: inventory
+    plan: standard
+    databaseName: inventory_db_0q4l
+    ipAllowList: []  # Only allow internal connections
+    settings:
+      max_connections: 100
+      work_mem: "4MB"
+      maintenance_work_mem: "64MB"
+      effective_cache_size: "128MB"
+      synchronous_commit: "off"

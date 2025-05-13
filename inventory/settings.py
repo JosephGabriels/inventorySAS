@@ -132,10 +132,29 @@ WSGI_APPLICATION = 'inventory.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default='postgresql://postgres:postgres@localhost:5432/inventory',
-        conn_max_age=600
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'inventory_db_0q4l',
+        'USER': 'josephgabriels',
+        'PASSWORD': 'IqFTkGzQX1437Xr42IfF4KMGckNnp7Yk',
+        'HOST': 'dpg-d08gg1adbo4c73acqrlg-a',  # Internal Render hostname
+        'PORT': '5432',
+        'CONN_MAX_AGE': 60,  # Keep connections alive for 60 seconds
+        'OPTIONS': {
+            'keepalives': 1,
+            'keepalives_idle': 30,
+            'keepalives_interval': 10,
+            'keepalives_count': 5,
+        }
+    }
+}
+
+# Add database optimization settings
+DATABASE_OPTIONS = {
+    'pool_size': 20,
+    'max_overflow': 5,
+    'pool_timeout': 30,
+    'pool_recycle': 1800,
 }
 
 CORS_ALLOW_CREDENTIALS = True

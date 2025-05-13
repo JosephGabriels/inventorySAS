@@ -8,12 +8,14 @@ const baseURL = import.meta.env.PROD
   ? 'https://inventorysas.onrender.com'  // Your production API URL
   : import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-// Create an axios instance with the base URL
+// Update the axios instance configuration
 const api = axios.create({
   baseURL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  timeout: 30000,  // Increase timeout to 30 seconds
+  timeoutErrorMessage: 'Server took too long to respond'
 })
 
 // Setup authentication token from localStorage if it exists
@@ -22,107 +24,69 @@ if (token) {
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`
 }
 
-// Add request interceptor for authorization and debugging
+// Add request interceptor with timeout handling
 api.interceptors.request.use(
   (config) => {
-    // Ensure baseURL is always set to production in production mode
     if (import.meta.env.PROD) {
-      config.baseURL = 'https://inventorysas.onrender.com';
+      config.baseURL = 'https://inventorysas.onrender.com'
     }
     
-    console.log('API Request:', {
-      url: config.url,
-      method: config.method,
-      baseURL: config.baseURL
-    });
+    // Add request timestamp
+    config.metadata = { startTime: new Date() }
     
-    return config;
+    // Log slow requests
+    const requestTimeout = setTimeout(() => {
+      console.warn('Slow request:', {
+        url: config.url,
+        method: config.method,
+        duration: new Date().getTime() - config.metadata.startTime.getTime()
+      })
+    }, 5000)  // Log requests taking more than 5 seconds
+    
+    config.metadata.timeoutId = requestTimeout
+    
+    return config
   },
   (error) => {
-    console.error('Request Error:', error)
     return Promise.reject(error)
   }
 )
 
-// Add response interceptor for token refresh and debugging
+// Add response interceptor for token refresh, debugging, and retry logic
 api.interceptors.response.use(
-  (response) => {
-    console.log('API Response:', {
-      url: response.config.url,
-      status: response.status,
-      data: response.data
-    })
-    return response
-  },
+  (response) => response,
   async (error) => {
-    const originalRequest = error.config
+    const { config } = error
     
-    // Handle token expiration (401 unauthorized)
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-      
-      try {
-        // Try to refresh the token
-        const refreshToken = localStorage.getItem('refreshToken')
-        if (refreshToken) {
-          const refreshResponse = await axios.post(`${baseURL}/api/token/refresh/`, {
-            refresh: refreshToken
-          })
-          
-          const { access: newAccessToken } = refreshResponse.data
-          
-          // Store the new token
-          localStorage.setItem('accessToken', newAccessToken)
-          
-          // Update default headers
-          api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`
-          
-          // Update the original request headers
-          originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`
-          
-          // Retry the original request
-          return api(originalRequest)
-        }
-      } catch (refreshError) {
-        // If refresh fails, log out the user
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
-        delete api.defaults.headers.common['Authorization']
-        
-        // Redirect to login page
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login'
-        }
-      }
+    // Only retry GET requests
+    if (!config || !config.method || config.method.toLowerCase() !== 'get') {
+      return Promise.reject(error)
     }
-    
-    // Display error messages
-    if (error.response?.data) {
-      const errorData = error.response.data
-      let message = 'An error occurred'
-      
-      if (typeof errorData === 'string') {
-        message = errorData
-      } else if (typeof errorData === 'object') {
-        const messages = []
-        for (const [key, value] of Object.entries(errorData)) {
-          if (Array.isArray(value)) {
-            messages.push(`${key}: ${value.join(', ')}`)
-          } else if (typeof value === 'string') {
-            messages.push(`${key}: ${value}`)
-          }
-        }
-        message = messages.join('\n')
-      }
-      
-      toast.error(message)
-    } else {
-      toast.error('An error occurred. Please try again.')
+
+    // Set up retry count
+    config.retryCount = config.retryCount || 0
+
+    // Maximum retry attempts
+    const MAX_RETRIES = 3
+
+    if (config.retryCount >= MAX_RETRIES) {
+      return Promise.reject(error)
     }
-    
-    return Promise.reject(error)
+
+    // Increase retry count
+    config.retryCount += 1
+
+    // Exponential backoff delay
+    const backoff = Math.min(1000 * (Math.pow(2, config.retryCount) - 1), 10000)
+
+    // Wait for backoff time
+    await new Promise(resolve => setTimeout(resolve, backoff))
+
+    // Return the promise for the retry
+    return api(config)
   }
 )
+
 // Authentication API
 export interface LoginCredentials {
   username: string;
@@ -253,6 +217,13 @@ export interface ProductData {
   category: number;
   supplier: number;
   primary_image?: File;
+}
+
+// Add these interfaces after your existing interfaces
+export interface DairyStats {
+  total_sales: number;
+  total_revenue: number;
+  average_daily_sales: number;
 }
 
 // Products API
@@ -541,6 +512,43 @@ export const salesAPI = {
     }
   }
 }
+
+// Dairy API
+export const dairyAPI = {
+  getStats: async (days: number = 1): Promise<DairyStats | null> => {
+    try {
+      const response = await api.get('/api/dairy/stats', {
+        params: { days }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching dairy stats:', error);
+      if (error.response?.status === 502) {
+        toast.error('Server temporarily unavailable');
+      } else {
+        toast.error('Failed to fetch dairy statistics');
+      }
+      return null;
+    }
+  },
+
+  getAnalytics: async (days: number = 1) => {
+    try {
+      const response = await api.get('/api/dairy/stats', {
+        params: { days }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching dairy analytics:', error);
+      if (error.response?.status === 502) {
+        toast.error('Server temporarily unavailable');
+      } else {
+        toast.error('Failed to fetch dairy analytics');
+      }
+      return null;
+    }
+  }
+};
 
 // Business Settings
 export interface BusinessSettings {
