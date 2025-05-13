@@ -623,14 +623,15 @@ export const userAPI = {
 export const dairyAPI = {
   getStats: async (days: number = 1) => {
     try {
-      const response = await api.get('api/dairy/stats', {
+      // Add leading slash and ensure trailing slash
+      const response = await api.get('/api/dairy/stats/', {
         params: { days }
       });
       return response.data;
     } catch (error: any) {
       console.error('Error fetching dairy stats:', error);
-      if (error.code === 'ERR_NETWORK') {
-        toast.error('Network error. Please check your connection.');
+      if (error.response?.status === 404) {
+        toast.error('Dairy statistics endpoint not found');
       } else {
         toast.error('Failed to fetch dairy statistics');
       }
@@ -640,14 +641,15 @@ export const dairyAPI = {
 
   getAnalytics: async (days: number = 1) => {
     try {
-      const response = await api.get('api/dairy/stats', {
+      // Add leading slash and ensure trailing slash
+      const response = await api.get('/api/dairy/stats/', {
         params: { days }
       });
       return response.data;
     } catch (error: any) {
       console.error('Error fetching dairy analytics:', error);
-      if (error.code === 'ERR_NETWORK') {
-        toast.error('Network error. Please check your connection.');
+      if (error.response?.status === 404) {
+        toast.error('Dairy analytics endpoint not found');
       } else {
         toast.error('Failed to fetch dairy analytics');
       }

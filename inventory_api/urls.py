@@ -34,7 +34,7 @@ urlpatterns = [
     path('sales/analytics', views.SalesAnalyticsView.as_view(), name='sales-analytics'),
     
     # Dairy endpoints
-    path('dairy/stats', views.DairyStatsView.as_view(), name='dairy-stats'),
+    path('dairy/stats/', views.DairyStatsView.as_view(), name='dairy-stats'),
     
     # Reports
     path('reports/generate/', views.GenerateReportView.as_view(), name='generate-report'),
