@@ -63,6 +63,7 @@ export const PointOfSale = () => {
   } | null>(null)
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
   const [currentSale, setCurrentSale] = useState<any>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
   const queryClient = useQueryClient()
   const receiptContainerRef = useRef<HTMLDivElement>(null)
 
@@ -327,15 +328,14 @@ export const PointOfSale = () => {
   };
 
   const handleCheckout = () => {
-    if (cart.length === 0) {
-      toast.error('Cart is empty')
-      return
+    if (cart.length === 0 || isProcessing) {
+      return;
     }
 
     const total = cart.reduce((sum, item) => 
       sum + (item.product.unit_price * item.quantity), 0
     );
-    const vat = total * (16/116); // Extract VAT from total price
+    const vat = total * (16/116);
     const subtotal = total - vat;
 
     const saleData = {
@@ -353,6 +353,9 @@ export const PointOfSale = () => {
   }
 
   const confirmSale = async () => {
+    if (isProcessing) return;
+    
+    setIsProcessing(true);
     try {
       const saleData = {
         items: cart.map(item => ({
@@ -364,10 +367,8 @@ export const PointOfSale = () => {
         payment_method: paymentMethod
       }
 
-      // First process the sale
       await salesAPI.create(saleData)
       
-      // Then handle the receipt printing
       const receiptData = {
         items: cart,
         totalAmount: currentSale.totalAmount,
@@ -376,10 +377,8 @@ export const PointOfSale = () => {
         date: currentSale.date
       }
 
-      // Print the receipt
       handlePrint(receiptData)
 
-      // Show success message and cleanup
       toast.success('Sale completed!')
       queryClient.invalidateQueries(['products'])
       setCart([])
@@ -388,6 +387,8 @@ export const PointOfSale = () => {
     } catch (error) {
       toast.error('Failed to process sale')
       console.error(error)
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -623,12 +624,14 @@ export const PointOfSale = () => {
 
           <button
             onClick={handleCheckout}
-            disabled={cart.length === 0}
-            className="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-600 disabled:to-gray-700 
-              text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 transition-all duration-300 transform hover:scale-[1.02]"
+            disabled={cart.length === 0 || isProcessing}
+            className="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 
+              disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed
+              text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg 
+              shadow-orange-500/20 transition-all duration-300 transform hover:scale-[1.02]"
           >
             <RiShoppingCartLine size={20} />
-            Complete Sale
+            {isProcessing ? 'Processing...' : 'Complete Sale'}
           </button>
         </div>
       </div>
@@ -703,9 +706,10 @@ export const PointOfSale = () => {
                 <div className="flex space-x-3">
                   <button
                     onClick={confirmSale}
-                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg transition-colors"
+                    disabled={isProcessing}
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors"
                   >
-                    Confirm & Print
+                    {isProcessing ? 'Processing...' : 'Confirm & Print'}
                   </button>
                   <button
                     onClick={() => setIsConfirmationOpen(false)}

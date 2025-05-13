@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import { api } from '../services/api'  // Import the configured api instance
 import { 
   RiBarChartBoxLine, 
   RiLoader4Line, 
@@ -63,13 +63,12 @@ export const DairyReports = () => {
   const fetchDairyAnalytics = async (days = timePeriod) => {
     setDairyStats(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const url = `${baseURL}/api/dairy/stats`;
       const params = isCustomDate && startDate && endDate 
         ? { start_date: startDate, end_date: endDate }
         : { days };
       
-      const response = await axios.get(url, { params });
+      // Use the configured api instance instead of axios directly
+      const response = await api.get('/api/dairy/stats/', { params });
       
       // Extract data from the dairy stats response
       const { total_stats, categories_used, product_count, message, dairy_products } = response.data;
@@ -115,7 +114,7 @@ export const DairyReports = () => {
       setDairyStats(prev => ({
         ...prev,
         isLoading: false,
-        error: 'Failed to fetch dairy statistics. Please ensure the API server is running.'
+        error: 'Failed to fetch dairy statistics'
       }));
     }
   };
