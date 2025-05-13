@@ -613,8 +613,11 @@ export const userAPI = {
 export const dairyAPI = {
   getStats: async (days: number = 1) => {
     try {
-      const response = await api.get('/api/dairy/stats', {
-        params: { days }
+      const response = await api.get('/api/dairy/stats/', { // Added trailing slash
+        params: { days },
+        baseURL: import.meta.env.PROD 
+          ? 'https://inventorysas.onrender.com'
+          : import.meta.env.VITE_API_URL || 'http://localhost:8000'
       });
       return response.data;
     } catch (error: any) {
@@ -626,8 +629,11 @@ export const dairyAPI = {
 
   getAnalytics: async (days: number = 1) => {
     try {
-      const response = await api.get('/api/dairy/stats', {
-        params: { days }
+      const response = await api.get('/api/dairy/stats/', { // Added trailing slash
+        params: { days },
+        baseURL: import.meta.env.PROD 
+          ? 'https://inventorysas.onrender.com'
+          : import.meta.env.VITE_API_URL || 'http://localhost:8000'
       });
       return response.data;
     } catch (error: any) {
