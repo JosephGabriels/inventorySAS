@@ -621,24 +621,32 @@ export const userAPI = {
 
 // Add dairy API endpoints
 interface DairyStats {
-  total_stats: {
-    total_sales: number;
-    total_revenue: number;
-    total_profit: number;
-    date: string;
-  };
-  categories_used: Array<{
-    category: string;
-    count: number;
-  }>;
-  product_count: number;
-  message?: string;
+  categories_used: string[];
   dairy_products: Array<{
-    name: string;
+    product__name: string;
+    product__id: number;
+    total_quantity: number;
+    total_revenue: number;
+    total_cost: number;
+  }>;
+  debug_info: {
+    dairy_categories_count: number;
+    dairy_products_count: number;
+    date_range: string;
+    data_source: string;
+  };
+  period: {
+    start_date: string;
+    end_date: string;
+    days: number;
+  };
+  product_count: number;
+  total_stats: {
+    cost: number;
+    profit: number;
     quantity: number;
     revenue: number;
-    date: string;
-  }>;
+  };
 }
 
 export const dairyAPI = {
@@ -648,21 +656,8 @@ export const dairyAPI = {
         params: { days }
       });
       
-      // Ensure dates are properly formatted
-      if (response.data) {
-        return {
-          ...response.data,
-          total_stats: {
-            ...response.data.total_stats,
-            date: new Date(response.data.total_stats.date).toISOString()
-          },
-          dairy_products: response.data.dairy_products.map(product => ({
-            ...product,
-            date: new Date(product.date).toISOString()
-          }))
-        };
-      }
-      return null;
+      // Return the data as-is without date conversion
+      return response.data;
     } catch (error: any) {
       console.error('Error fetching dairy stats:', error);
       if (error.response?.status === 404) {
