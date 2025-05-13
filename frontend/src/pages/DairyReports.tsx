@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api } from '../services/api'  // Import the configured api instance
+import { api, dairyAPI } from '../services/api'  // Import both api instance and dairyAPI
 import { 
   RiBarChartBoxLine, 
   RiLoader4Line, 
@@ -61,61 +61,15 @@ export const DairyReports = () => {
 
   // Function to fetch category analytics data
   const fetchDairyAnalytics = async (days = timePeriod) => {
-    setDairyStats(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      const params = isCustomDate && startDate && endDate 
-        ? { start_date: startDate, end_date: endDate }
-        : { days };
-      
-      // Use the configured api instance instead of axios directly
-      const response = await api.get('/api/dairy/stats/', { params });
-      
-      // Extract data from the dairy stats response
-      const { total_stats, categories_used, product_count, message, dairy_products } = response.data;
-      
-      // Set any informational message
-      setMessage(message || null);
-      
-      // Set categories used and product count
-      setCategoriesUsed(categories_used || []);
-      setProductCount(product_count || 0);
-      
-      // Set dairy products list
-      setDairyProducts(dairy_products || []);
-      
-      if (total_stats) {
-        const totalSales = total_stats.revenue || 0;
-        const totalCost = total_stats.cost || 0;
-        const totalProfit = total_stats.profit || 0;
-        const profitPercentage = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
-        
-        setDairyStats({
-          totalSales,
-          totalCost,
-          totalProfit,
-          profitPercentage,
-          totalQuantity: total_stats.quantity || 0,
-          isLoading: false,
-          error: null
-        });
-      } else {
-        setDairyStats({
-          totalSales: 0,
-          totalCost: 0,
-          totalProfit: 0,
-          profitPercentage: 0,
-          totalQuantity: 0,
-          isLoading: false,
-          error: null
-        });
+      const response = await dairyAPI.getStats(days);  // Use dairyAPI instead of direct api call
+      if (response) {
+        // Handle the response data
+        setDairyStats(response);
       }
     } catch (error) {
       console.error('Error fetching dairy analytics:', error);
-      setDairyStats(prev => ({
-        ...prev,
-        isLoading: false,
-        error: 'Failed to fetch dairy statistics'
-      }));
+      setDairyStats(null);
     }
   };
 

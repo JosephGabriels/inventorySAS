@@ -8,8 +8,8 @@ const baseURL = import.meta.env.PROD
   ? 'https://inventorysas.onrender.com'  // Your production API URL
   : import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-// Create an axios instance with the base URL
-const api = axios.create({
+// Export the api instance
+export const api = axios.create({
   baseURL,
   headers: {
     'Content-Type': 'application/json'
