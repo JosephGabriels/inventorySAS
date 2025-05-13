@@ -25,16 +25,26 @@ if (token) {
 // Add request interceptor for authorization and debugging
 api.interceptors.request.use(
   (config) => {
-    // Always use production URL in production mode
+    // Force production URL for all requests in production mode
     if (import.meta.env.PROD) {
       config.baseURL = 'https://inventorysas.onrender.com';
     }
     
-    // Log request details for debugging
+    // Ensure all requests have the correct baseURL
+    if (!config.baseURL) {
+      config.baseURL = baseURL;
+    }
+    
+    // Add trailing slash if missing
+    if (config.url && !config.url.endsWith('/')) {
+      config.url = `${config.url}/`;
+    }
+    
     console.log('API Request:', {
       url: config.url,
       method: config.method,
-      baseURL: config.baseURL
+      baseURL: config.baseURL,
+      fullUrl: `${config.baseURL}${config.url}`
     });
     
     return config;
@@ -613,26 +623,34 @@ export const userAPI = {
 export const dairyAPI = {
   getStats: async (days: number = 1) => {
     try {
-      const response = await api.get('/api/dairy/stats/', {
+      const response = await api.get('api/dairy/stats', {
         params: { days }
       });
       return response.data;
     } catch (error: any) {
       console.error('Error fetching dairy stats:', error);
-      toast.error('Failed to fetch dairy statistics');
+      if (error.code === 'ERR_NETWORK') {
+        toast.error('Network error. Please check your connection.');
+      } else {
+        toast.error('Failed to fetch dairy statistics');
+      }
       return null;
     }
   },
 
   getAnalytics: async (days: number = 1) => {
     try {
-      const response = await api.get('/api/dairy/stats/', {
+      const response = await api.get('api/dairy/stats', {
         params: { days }
       });
       return response.data;
     } catch (error: any) {
       console.error('Error fetching dairy analytics:', error);
-      toast.error('Failed to fetch dairy analytics');
+      if (error.code === 'ERR_NETWORK') {
+        toast.error('Network error. Please check your connection.');
+      } else {
+        toast.error('Failed to fetch dairy analytics');
+      }
       return null;
     }
   }
