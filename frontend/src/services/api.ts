@@ -8,8 +8,8 @@ const baseURL = import.meta.env.PROD
   ? 'https://inventorysas.onrender.com'  // Your production API URL
   : import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-// Export the api instance
-export const api = axios.create({
+// Create an axios instance with the base URL
+const api = axios.create({
   baseURL,
   headers: {
     'Content-Type': 'application/json'
@@ -620,48 +620,17 @@ export const userAPI = {
 };
 
 // Add dairy API endpoints
-interface DairyStats {
-  categories_used: string[];
-  dairy_products: Array<{
-    product__name: string;
-    product__id: number;
-    total_quantity: number;
-    total_revenue: number;
-    total_cost: number;
-  }>;
-  debug_info: {
-    dairy_categories_count: number;
-    dairy_products_count: number;
-    date_range: string;
-    data_source: string;
-  };
-  period: {
-    start_date: string;
-    end_date: string;
-    days: number;
-  };
-  product_count: number;
-  total_stats: {
-    cost: number;
-    profit: number;
-    quantity: number;
-    revenue: number;
-  };
-}
-
 export const dairyAPI = {
-  getStats: async (days: number = 1): Promise<DairyStats | null> => {
+  getStats: async (days: number = 1) => {
     try {
-      const response = await api.get<DairyStats>('/api/dairy/stats/', {
+      const response = await api.get('api/dairy/stats', {
         params: { days }
       });
-      
-      // Return the data as-is without date conversion
       return response.data;
     } catch (error: any) {
       console.error('Error fetching dairy stats:', error);
-      if (error.response?.status === 404) {
-        toast.error('Dairy statistics endpoint not found');
+      if (error.code === 'ERR_NETWORK') {
+        toast.error('Network error. Please check your connection.');
       } else {
         toast.error('Failed to fetch dairy statistics');
       }
@@ -669,8 +638,21 @@ export const dairyAPI = {
     }
   },
 
-  getAnalytics: async (days: number = 1): Promise<DairyStats | null> => {
-    return dairyAPI.getStats(days);
+  getAnalytics: async (days: number = 1) => {
+    try {
+      const response = await api.get('api/dairy/stats', {
+        params: { days }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching dairy analytics:', error);
+      if (error.code === 'ERR_NETWORK') {
+        toast.error('Network error. Please check your connection.');
+      } else {
+        toast.error('Failed to fetch dairy analytics');
+      }
+      return null;
+    }
   }
 };
 

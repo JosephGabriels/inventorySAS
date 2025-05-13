@@ -8,47 +8,40 @@ import {
   RiCalendarLine
 } from 'react-icons/ri'
 
+// Update the interfaces to match the API response
 interface DairyStats {
-  totalSales: number;
-  totalCost: number;
-  totalProfit: number;
-  profitPercentage: number;
-  totalQuantity: number;
-  isLoading: boolean;
-  error: string | null;
-}
-
-interface SalesAnalytics {
+  categories_used: string[];
+  dairy_products: Array<{
+    product__name: string;
+    product__id: number;
+    total_quantity: number;
+    total_revenue: number;
+    total_cost: number;
+    profit: number;
+  }>;
+  debug_info: {
+    dairy_categories_count: number;
+    dairy_products_count: number;
+    date_range: string;
+    data_source: string;
+  };
   period: {
     start_date: string;
     end_date: string;
     days: number;
   };
   total_stats: {
-    revenue: number;
     cost: number;
     profit: number;
     quantity: number;
+    revenue: number;
   };
-  analytics: Array<{
-    product__category__name: string;
-    total_quantity: number;
-    total_revenue: number;
-    total_cost: number;
-    profit: number;
-  }>;
 }
 
 export const DairyReports = () => {
-  const [dairyStats, setDairyStats] = useState<DairyStats>({
-    totalSales: 0,
-    totalCost: 0,
-    totalProfit: 0,
-    profitPercentage: 0,
-    totalQuantity: 0,
-    isLoading: true,
-    error: null
-  });
+  const [dairyStats, setDairyStats] = useState<DairyStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [categoriesUsed, setCategoriesUsed] = useState<string[]>([]);
   const [productCount, setProductCount] = useState<number>(0);
   const [message, setMessage] = useState<string | null>(null);
@@ -59,17 +52,22 @@ export const DairyReports = () => {
   const [endDate, setEndDate] = useState<string>('');
   const [isCustomDate, setIsCustomDate] = useState<boolean>(false);
 
-  // Function to fetch category analytics data
+  // Update the fetch function
   const fetchDairyAnalytics = async (days = timePeriod) => {
+    setIsLoading(true);
     try {
-      const response = await dairyAPI.getStats(days);  // Use dairyAPI instead of direct api call
+      const response = await dairyAPI.getStats(days);
       if (response) {
-        // Handle the response data
         setDairyStats(response);
+        setCategoriesUsed(response.categories_used);
+        setProductCount(response.debug_info.dairy_products_count);
+        setDairyProducts(response.dairy_products);
       }
     } catch (error) {
       console.error('Error fetching dairy analytics:', error);
-      setDairyStats(null);
+      setError('Failed to fetch dairy statistics');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -116,14 +114,37 @@ export const DairyReports = () => {
     fetchDairyAnalytics();
   };
 
-  // Loading state
-  if (dairyStats.isLoading) {
+  // Update the loading check
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <RiLoader4Line className="animate-spin text-primary-500 w-10 h-10" />
       </div>
     );
   }
+
+  // Update the statistics display
+  const renderStatistics = () => {
+    if (!dairyStats) return null;
+    
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-white">Total Sales</h3>
+            <span className="text-primary-500">Dairy</span>
+          </div>
+          <p className="text-2xl font-bold text-primary-500 mt-2">
+            Ksh {dairyStats.total_stats.revenue.toLocaleString()}
+          </p>
+          <p className="text-sm text-gray-400 mt-1">
+            {dairyStats.period.start_date} to {dairyStats.period.end_date}
+          </p>
+        </div>
+        {/* Add other stat cards similarly */}
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -221,130 +242,13 @@ export const DairyReports = () => {
         </div>
       )}
       
-      {dairyStats.error ? (
+      {error ? (
         <div className="text-red-500 p-4 text-center card">
-          {dairyStats.error}
+          {error}
         </div>
       ) : (
         <>
-          {/* Main Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="card p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-white">Total Sales</h3>
-                <span className="text-primary-500">
-                  {categoriesUsed.length > 0 ? 
-                    `${categoriesUsed.join(', ')}` : 
-                    'Dairy'
-                  }
-                </span>
-              </div>
-              <p className="text-2xl font-bold text-primary-500 mt-2">
-                Ksh {dairyStats.totalSales.toLocaleString()}
-              </p>
-              <p className="text-sm text-gray-400 mt-1">
-                {isCustomDate ? 'Custom period' : timePeriod === 1 ? 'Today' : timePeriod === 7 ? 'Last 7 days' : 'Last 30 days'}
-              </p>
-            </div>
-
-            <div className="card p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-white">Total Profit</h3>
-                <span className="text-green-500">Real-time</span>
-              </div>
-              <p className="text-2xl font-bold text-primary-500 mt-2">
-                Ksh {dairyStats.totalProfit.toLocaleString()}
-              </p>
-              <p className="text-sm text-gray-400 mt-1">
-                {isCustomDate ? 'Custom period' : timePeriod === 1 ? 'Today' : timePeriod === 7 ? 'Last 7 days' : 'Last 30 days'}
-              </p>
-            </div>
-
-            <div className="card p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-white">Items Sold</h3>
-                <span className="text-primary-500">{dairyStats.totalQuantity} units</span>
-              </div>
-              <p className="text-2xl font-bold text-primary-500 mt-2">
-                {dairyStats.totalQuantity.toLocaleString()}
-              </p>
-              <p className="text-sm text-gray-400 mt-1">
-                {isCustomDate ? 'Custom period' : timePeriod === 1 ? 'Today' : timePeriod === 7 ? 'Last 7 days' : 'Last 30 days'}
-              </p>
-            </div>
-
-            <div className="card p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-white">Profit Margin</h3>
-                <span className="text-green-500">Real-time</span>
-              </div>
-              <p className="text-2xl font-bold text-primary-500 mt-2">{dairyStats.profitPercentage.toFixed(2)}%</p>
-              <p className="text-sm text-gray-400 mt-1">
-                {isCustomDate ? 'Custom period' : timePeriod === 1 ? 'Today' : timePeriod === 7 ? 'Last 7 days' : 'Last 30 days'}
-              </p>
-            </div>
-          </div>
-
-          {/* Progress Bars */}
-          <div className="card p-6 mb-6">
-            <h3 className="text-lg font-medium text-white mb-4">Performance Metrics</h3>
-            
-            <div className="space-y-6">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="text-md font-medium text-white">Sales Target</h4>
-                  <span className="text-primary-500 text-sm">
-                    {dairyStats.totalSales.toLocaleString()} / 10,000 Ksh
-                  </span>
-                </div>
-                <div className="w-full bg-dark-700 h-4 rounded-full">
-                  <div 
-                    className="bg-primary-500 h-4 rounded-full" 
-                    style={{ width: `${Math.min(100, (dairyStats.totalSales / 10000) * 100)}%` }}
-                  ></div>
-                </div>
-                <p className="text-sm text-gray-400 mt-2">
-                  {Math.min(100, Math.round((dairyStats.totalSales / 10000) * 100))}% of daily target
-                </p>
-              </div>
-              
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="text-md font-medium text-white">Profit Goal</h4>
-                  <span className="text-primary-500 text-sm">
-                    {dairyStats.totalProfit.toLocaleString()} / 3,000 Ksh
-                  </span>
-                </div>
-                <div className="w-full bg-dark-700 h-4 rounded-full">
-                  <div 
-                    className="bg-green-500 h-4 rounded-full" 
-                    style={{ width: `${Math.min(100, (dairyStats.totalProfit / 3000) * 100)}%` }}
-                  ></div>
-                </div>
-                <p className="text-sm text-gray-400 mt-2">
-                  {Math.min(100, Math.round((dairyStats.totalProfit / 3000) * 100))}% of daily target
-                </p>
-              </div>
-              
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="text-md font-medium text-white">Units Sold</h4>
-                  <span className="text-primary-500 text-sm">
-                    {dairyStats.totalQuantity.toLocaleString()} / 100 units
-                  </span>
-                </div>
-                <div className="w-full bg-dark-700 h-4 rounded-full">
-                  <div 
-                    className="bg-blue-500 h-4 rounded-full" 
-                    style={{ width: `${Math.min(100, (dairyStats.totalQuantity / 100) * 100)}%` }}
-                  ></div>
-                </div>
-                <p className="text-sm text-gray-400 mt-2">
-                  {Math.min(100, Math.round((dairyStats.totalQuantity / 100) * 100))}% of daily target
-                </p>
-              </div>
-            </div>
-          </div>
+          {renderStatistics()}
 
           {/* Product Details Table */}
           {dairyProducts && dairyProducts.length > 0 && (
@@ -408,14 +312,14 @@ export const DairyReports = () => {
               <div className="flex justify-between border-b border-dark-700 pb-2">
                 <span className="text-gray-400">Average Cost per Item</span>
                 <span className="text-white font-medium">
-                  Ksh {dairyStats.totalQuantity ? (dairyStats.totalCost / dairyStats.totalQuantity).toFixed(2) : '0.00'}
+                  Ksh {dairyStats?.total_stats.quantity ? (dairyStats.total_stats.cost / dairyStats.total_stats.quantity).toFixed(2) : '0.00'}
                 </span>
               </div>
               
               <div className="flex justify-between border-b border-dark-700 pb-2">
                 <span className="text-gray-400">Average Profit per Item</span>
                 <span className="text-white font-medium">
-                  Ksh {dairyStats.totalQuantity ? (dairyStats.totalProfit / dairyStats.totalQuantity).toFixed(2) : '0.00'}
+                  Ksh {dairyStats?.total_stats.quantity ? (dairyStats.total_stats.profit / dairyStats.total_stats.quantity).toFixed(2) : '0.00'}
                 </span>
               </div>
               
