@@ -25,24 +25,18 @@ if (token) {
 // Add request interceptor for authorization and debugging
 api.interceptors.request.use(
   (config) => {
+    // Ensure baseURL is always set to production in production mode
+    if (import.meta.env.PROD) {
+      config.baseURL = 'https://inventorysas.onrender.com';
+    }
+    
     console.log('API Request:', {
       url: config.url,
       method: config.method,
       baseURL: config.baseURL
-    })
+    });
     
-    // Don't set Content-Type for FormData, axios will set it automatically with boundary
-    if (!(config.data instanceof FormData)) {
-      config.headers['Content-Type'] = 'application/json'
-    }
-    
-    // Add the token to the header if it exists and isn't already set
-    const token = localStorage.getItem('accessToken')
-    if (token && !config.headers['Authorization']) {
-      config.headers['Authorization'] = `Bearer ${token}`
-    }
-    
-    return config
+    return config;
   },
   (error) => {
     console.error('Request Error:', error)
