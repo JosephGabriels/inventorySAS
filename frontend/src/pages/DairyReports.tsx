@@ -51,10 +51,13 @@ export const DairyReports = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [isCustomDate, setIsCustomDate] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   // Update the fetch function
   const fetchDairyAnalytics = async (days = timePeriod) => {
     setIsLoading(true);
+    setIsRefreshing(true);
     try {
       const response = await dairyAPI.getStats(days);
       if (response) {
@@ -62,12 +65,14 @@ export const DairyReports = () => {
         setCategoriesUsed(response.categories_used);
         setProductCount(response.debug_info.dairy_products_count);
         setDairyProducts(response.dairy_products);
+        setLastUpdated(new Date());
       }
     } catch (error) {
       console.error('Error fetching dairy analytics:', error);
       setError('Failed to fetch dairy statistics');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -256,10 +261,11 @@ export const DairyReports = () => {
         <div className="flex space-x-2">
           <button 
             onClick={handleRefreshDairyData}
-            className="btn-secondary flex items-center"
+            disabled={isRefreshing}
+            className={`btn-secondary flex items-center ${isRefreshing ? 'opacity-75' : ''}`}
           >
-            <RiRefreshLine className="mr-2" />
-            Refresh Data
+            <RiRefreshLine className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Updating...' : 'Refresh'}
           </button>
           <button className="btn-primary flex items-center">
             <RiDownloadLine className="mr-2" />
@@ -423,7 +429,9 @@ export const DairyReports = () => {
               
               <div className="flex justify-between">
                 <span className="text-gray-400">Last Updated</span>
-                <span className="text-white font-medium">{new Date().toLocaleTimeString()}</span>
+                <span className="text-white font-medium">
+                  {lastUpdated.toLocaleTimeString()}
+                </span>
               </div>
             </div>
           </div>
