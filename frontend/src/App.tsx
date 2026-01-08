@@ -6,9 +6,11 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { Dashboard } from './pages/Dashboard'
 import { PointOfSale } from './pages/PointOfSale'
+import { Cash } from './pages/Cash'
 import { Products } from './pages/Products'
 import { Categories } from './pages/Categories'
 import { Suppliers } from './pages/Suppliers'
+import { Customers } from './pages/Customers'
 import { StockMovements } from './pages/StockMovements'
 import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
@@ -44,9 +46,11 @@ export const App = () => {
               >
                 <Route index element={<Dashboard />} />
                 <Route path="point-of-sale" element={<PointOfSale />} />
+                <Route path="cash" element={<Cash />} />
                 <Route path="products" element={<Products />} />
                 <Route path="categories" element={<Categories />} />
                 <Route path="suppliers" element={<Suppliers />} />
+                <Route path="customers" element={<Customers />} />
                 <Route path="stock-movements" element={<StockMovements />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="dairy-reports" element={<DairyReports />} />

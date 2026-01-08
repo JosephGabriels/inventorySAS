@@ -4,9 +4,13 @@ export interface UserData {
   email: string;
   first_name: string;
   last_name: string;
-  is_admin: boolean;
+  role: 'admin' | 'manager' | 'staff';
   is_active: boolean;
-  role: string;
+  is_admin: boolean;  // Computed property from backend
+  is_manager: boolean;  // Computed property from backend
+  force_password_change: boolean;
+  date_joined: string;
+  last_login: string | null;
 }
 
 export interface SaleItem {
@@ -30,7 +34,7 @@ export interface RegisterData {
   password_confirm: string;
   first_name: string;
   last_name: string;
-  role: string;
+  role: 'admin' | 'manager' | 'staff';
 }
 
 export interface StockMovement {

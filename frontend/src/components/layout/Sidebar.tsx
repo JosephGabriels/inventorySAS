@@ -11,6 +11,8 @@ import {
   RiShoppingCart2Line,
   RiBarChartBoxLine,
   RiFileListLine,
+  RiMoneyDollarCircleLine,
+  RiUser3Line,
 } from 'react-icons/ri'
 
 interface NavItemProps {
@@ -19,9 +21,10 @@ interface NavItemProps {
   label: string
 }
 
-const NavItem = ({ to, icon, label }: NavItemProps) => (
+const NavItem = ({ to, icon, label, end = false }: { to: string; icon: React.ReactNode; label: string; end?: boolean }) => (
   <NavLink
     to={to}
+    end={end}
     className={({ isActive }) =>
       `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
         isActive
@@ -41,10 +44,12 @@ export const Sidebar = () => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: RiDashboardLine },
     { name: 'Point of Sale', href: '/point-of-sale', icon: RiShoppingCart2Line },
+    { name: 'Cash', href: '/cash', icon: RiMoneyDollarCircleLine },
     { name: 'Sales History', href: '/sales', icon: RiFileListLine },
     { name: 'Products', href: '/products', icon: RiArchiveLine },
     { name: 'Categories', href: '/categories', icon: RiPriceTag3Line },
     { name: 'Suppliers', href: '/suppliers', icon: RiUserSettingsLine },
+    { name: 'Customers', href: '/customers', icon: RiUser3Line },
     { name: 'Stock Movements', href: '/stock-movements', icon: RiExchangeLine },
     { name: 'Reports', href: '/reports', icon: RiFileChartLine },
     { name: 'Dairy Reports', href: '/dairy-reports', icon: RiBarChartBoxLine },
@@ -55,7 +60,7 @@ export const Sidebar = () => {
     <div className="w-64 bg-dark-800 border-r border-dark-700 flex-shrink-0">
       <nav className="mt-5 px-3 space-y-1">
         {navigation.map((item) => (
-          <NavItem key={item.href} to={item.href} icon={<item.icon />} label={item.name} />
+          <NavItem key={item.href} to={item.href} icon={<item.icon />} label={item.name} end={item.href === '/'} />
         ))}
       </nav>
       <div className="absolute bottom-0 w-64 p-4 bg-dark-800 border-t border-dark-700">

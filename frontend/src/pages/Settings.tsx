@@ -3,76 +3,61 @@ import {
   RiUserSettingsLine,
   RiLockLine,
   RiTeamLine,
-  RiAddLine,
-  RiEditLine,
-  RiDeleteBinLine,
   RiStore3Line,
-  RiSave3Line,
-  RiAlertLine,
+  RiSettings3Line,
+  RiPaletteLine,
+  RiNotification3Line,
+  RiShieldCheckLine,
 } from 'react-icons/ri'
 import { useAuth } from '../contexts/AuthContext'
-import { 
-  UserData, 
-  fetchUsers, 
-  createUser, 
-  updateUser, 
-  deleteUser,
-  businessSettingsAPI,
-  BusinessSettings,
-  userPasswordAPI
-} from '../services/api'
-import toast from 'react-hot-toast'
 import { SecuritySection } from '../components/settings/SecuritySection'
 import { UserManagementSection } from '../components/settings/UserManagementSection'
 import { BusinessSection } from '../components/settings/BusinessSection'
 import { ProfileSection } from '../components/settings/ProfileSection'
 
-const settingsSections = [
+interface SettingsSection {
+  id: string
+  name: string
+  icon: React.ComponentType<{ className?: string }>
+  description: string
+  adminOnly: boolean
+  color: string
+}
+
+const settingsSections: SettingsSection[] = [
+  {
+    id: 'profile',
+    name: 'Profile Settings',
+    icon: RiUserSettingsLine,
+    description: 'Manage your personal information and preferences',
+    adminOnly: false,
+    color: 'from-blue-500 to-blue-600',
+  },
+  {
+    id: 'security',
+    name: 'Security',
+    icon: RiLockLine,
+    description: 'Password and security settings',
+    adminOnly: false,
+    color: 'from-green-500 to-green-600',
+  },
   {
     id: 'business',
     name: 'Business Settings',
     icon: RiStore3Line,
     description: 'Configure your business information',
     adminOnly: true,
-  },
-  {
-    id: 'profile',
-    name: 'Profile Settings',
-    icon: RiUserSettingsLine,
-    description: 'Update your personal information and preferences',
-    adminOnly: false,
-  },
-  {
-    id: 'security',
-    name: 'Security',
-    icon: RiLockLine,
-    description: 'Manage your security preferences',
-    adminOnly: false,
+    color: 'from-purple-500 to-purple-600',
   },
   {
     id: 'users',
     name: 'User Management',
     icon: RiTeamLine,
-    description: 'Add, edit, and remove system users',
+    description: 'Manage system users and permissions',
     adminOnly: true,
+    color: 'from-orange-500 to-orange-600',
   },
 ]
-
-const formStyles = {
-  wrapper: "max-w-md mx-auto bg-[#1a1f2e] rounded-xl shadow-lg border border-[#31394d]/50 p-6",
-  warningAlert: "mb-6 p-4 bg-red-900/30 border border-red-500/50 text-red-200 rounded-lg flex items-center gap-3",
-  inputGroup: "space-y-2 mb-6",
-  label: "block text-sm font-medium text-gray-300",
-  input: `w-full px-4 py-3 bg-[#151b29] border border-[#31394d] rounded-lg
-    text-gray-100 placeholder-gray-500
-    focus:ring-2 focus:ring-orange-500/50 focus:border-transparent
-    transition-all duration-200`,
-  button: `w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 
-    hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-lg 
-    transform transition-all duration-200 hover:scale-[1.02] 
-    focus:ring-2 focus:ring-orange-500/50 focus:ring-offset-2 focus:ring-offset-[#1a1f2e]
-    shadow-lg shadow-orange-500/20`
-}
 
 export const Settings = () => {
   const [activeSection, setActiveSection] = useState('profile')
@@ -83,50 +68,102 @@ export const Settings = () => {
     !section.adminOnly || (section.adminOnly && isAdmin())
   )
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-white">Settings</h1>
-        <div className="text-sm">
-          <span className="text-gray-400">Current user:</span>
-          <span className="text-white ml-2 font-medium">{user?.username}</span>
-        </div>
-      </div>
+  const activeConfig = settingsSections.find(s => s.id === activeSection)
 
-      {/* Settings Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredSections.map((section) => (
-          <div
-            key={section.id}
-            onClick={() => setActiveSection(section.id)}
-            className="bg-[#1a1f2e] p-4 rounded-xl border border-[#31394d]/50 
-              hover:border-orange-500/30 cursor-pointer transition-all duration-200"
-          >
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-orange-500/10 rounded-lg">
-                <section.icon className="text-xl text-orange-500" />
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900">
+      {/* Header */}
+      <div className="bg-dark-800/50 backdrop-blur-sm border-b border-dark-700 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <RiSettings3Line className="text-orange-500" />
+                Settings
+              </h1>
+              <p className="text-gray-400 mt-1">Manage your account and system preferences</p>
+            </div>
+            <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-dark-700/50 rounded-lg border border-dark-600">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white font-semibold">
+                {user?.first_name?.[0]}{user?.last_name?.[0]}
               </div>
               <div>
-                <h3 className="font-medium text-white">{section.name}</h3>
-                <p className="text-sm text-gray-400 mt-1">{section.description}</p>
+                <p className="text-sm font-medium text-white">{user?.first_name} {user?.last_name}</p>
+                <p className="text-xs text-gray-400">@{user?.username}</p>
               </div>
             </div>
           </div>
-        ))}
+        </div>
       </div>
 
-      {/* Active Section Content */}
-      <div className="mt-8">
-        {activeSection === 'business' && <BusinessSection />}
-        {activeSection === 'profile' && <ProfileSection user={user} />}
-        {activeSection === 'security' && <SecuritySection user={user} />}
-        {activeSection === 'users' && <UserManagementSection currentUser={user} />}
-        {activeSection === 'notifications' && (
-          <div className="text-gray-400">Notification settings coming soon...</div>
-        )}
-        {activeSection === 'appearance' && (
-          <div className="text-gray-400">Appearance settings coming soon...</div>
-        )}
-        {activeSection === 'alerts' && (
-          <div className="text-gray-400">Alert settings coming soon...</div>        )}        {activeSection === 'system' && (          <div className="text-gray-400">System settings coming soon...</div>        )}      </div>    </div>  )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar Navigation */}
+          <div className="lg:col-span-1">
+            <div className="bg-dark-800 rounded-xl border border-dark-700 p-4 sticky top-24 overflow-hidden">
+              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                Navigation
+              </h2>
+              <nav className="space-y-2 overflow-y-auto max-h-[calc(100vh-12rem)]">
+                {filteredSections.map((section) => {
+                  const Icon = section.icon
+                  const isActive = activeSection === section.id
+                  
+                  return (
+                    <button
+                      key={section.id}
+                      onClick={() => setActiveSection(section.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                        isActive
+                          ? `bg-gradient-to-r ${section.color} text-white shadow-lg`
+                          : 'text-gray-400 hover:text-white hover:bg-dark-700'
+                      }`}
+                    >
+                      <Icon className={`text-xl ${isActive ? 'text-white' : ''}`} />
+                      <span className="font-medium">{section.name}</span>
+                    </button>
+                  )
+                })}
+              </nav>
+
+              {/* User Role Badge */}
+              <div className="mt-6 pt-6 border-t border-dark-700">
+                <div className="flex items-center gap-2 px-3 py-2 bg-dark-700 rounded-lg">
+                  <RiShieldCheckLine className="text-orange-500" />
+                  <div>
+                    <p className="text-xs text-gray-400">Your Role</p>
+                    <p className="text-sm font-medium text-white capitalize">{user?.role}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="lg:col-span-3">
+            {/* Section Header */}
+            {activeConfig && (
+              <div className="mb-6">
+                <div className={`inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r ${activeConfig.color} rounded-xl shadow-lg`}>
+                  <activeConfig.icon className="text-2xl text-white" />
+                  <div>
+                    <h2 className="text-xl font-bold text-white">{activeConfig.name}</h2>
+                    <p className="text-sm text-white/80">{activeConfig.description}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Content */}
+            <div className="bg-dark-800 rounded-xl border border-dark-700 p-6 shadow-xl">
+              {activeSection === 'profile' && <ProfileSection />}
+              {activeSection === 'security' && <SecuritySection />}
+              {activeSection === 'business' && <BusinessSection />}
+              {activeSection === 'users' && <UserManagementSection currentUser={user} />}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

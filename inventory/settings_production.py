@@ -1,3 +1,4 @@
+
 """
 Production settings for the inventory project.
 These settings extend the base settings but configure the application for a production environment.
@@ -47,18 +48,14 @@ CSRF_COOKIE_SECURE = True
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Update CORS settings for production
-CORS_ALLOWED_ORIGINS = [
-    # Add your frontend domain(s) here
-    "https://inventory-frontend.onrender.com",
-]
+# Update CORS settings for production - use environment variable
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    'CORS_ALLOWED_ORIGINS',
+    'https://inventory-frontend.onrender.com'
+).split(',')
 
-# Set default JWT token lifetimes for production
-SIMPLE_JWT = {
-    **SIMPLE_JWT,  # Include base settings
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),  # Shorter lifetime in production
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-}
+# JWT token lifetimes are already configured in base settings.py
+# They will use environment variables if set, otherwise use defaults
 
 # Configure logging
 LOGGING = {

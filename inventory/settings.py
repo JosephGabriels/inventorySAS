@@ -16,7 +16,7 @@ import os
 import dj_database_url
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,23 +29,25 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'your-default-secret-key')
+# SECRET_KEY must be set in environment variables - no default for security
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable must be set")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    '.onrender.com',
-    os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''),
-]
+# Parse ALLOWED_HOSTS from environment variable (comma-separated)
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# Add Render hostname if present
+if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
+    ALLOWED_HOSTS.append(os.environ.get('RENDER_EXTERNAL_HOSTNAME'))
 
-# Update CORS settings too
-CORS_ALLOWED_ORIGINS = [
-    "https://inventorysas.onrender.com",
-    # ...other origins...
-]
+# Parse CORS_ALLOWED_ORIGINS from environment variable (comma-separated)
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:3000,http://127.0.0.1:3000'
+).split(',')
 
 # Application definition
 
@@ -69,17 +71,17 @@ INSTALLED_APPS = [
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'inventory_api.authentication.ActiveUserJWTAuthentication',  # Custom authentication that checks is_active
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.AllowAny',  # Temporarily allow all access for development
     ),
 }
 
-# JWT settings
+# JWT settings - configurable via environment variables
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=int(os.environ.get('JWT_ACCESS_TOKEN_LIFETIME_DAYS', '1'))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.environ.get('JWT_REFRESH_TOKEN_LIFETIME_DAYS', '7'))),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': False,
@@ -132,29 +134,19 @@ WSGI_APPLICATION = 'inventory.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'inventory_db_0q4l',
-        'USER': 'josephgabriels',
-        'PASSWORD': 'IqFTkGzQX1437Xr42IfF4KMGckNnp7Yk',
-        'HOST': 'dpg-d08gg1adbo4c73acqrlg-a',  # Internal Render hostname
-        'PORT': '5432',
-        'CONN_MAX_AGE': 60,  # Keep connections alive for 60 seconds
-        'OPTIONS': {
-            'keepalives': 1,
-            'keepalives_idle': 30,
-            'keepalives_interval': 10,
-            'keepalives_count': 5,
-        }
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=60,
+        conn_health_checks=True,
+    )
 }
 
-# Add database optimization settings
+# Database optimization settings - configurable via environment variables
 DATABASE_OPTIONS = {
-    'pool_size': 20,
-    'max_overflow': 5,
-    'pool_timeout': 30,
-    'pool_recycle': 1800,
+    'pool_size': int(os.environ.get('DB_POOL_SIZE', '20')),
+    'max_overflow': int(os.environ.get('DB_MAX_OVERFLOW', '5')),
+    'pool_timeout': int(os.environ.get('DB_POOL_TIMEOUT', '30')),
+    'pool_recycle': int(os.environ.get('DB_POOL_RECYCLE', '1800')),
 }
 
 CORS_ALLOW_CREDENTIALS = True

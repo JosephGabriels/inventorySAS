@@ -9,8 +9,10 @@ import {
 } from 'react-icons/ri'
 import { Dialog } from '@headlessui/react'
 import { toast } from 'react-hot-toast'
+import { useBusiness } from '../contexts/BusinessContext'
 
 const Sales = () => {
+  const { businessSettings } = useBusiness()
   // Initialize with today's date
   const today = startOfToday()
   const [startDate, setStartDate] = useState(format(today, 'yyyy-MM-dd'))
@@ -45,6 +47,15 @@ const Sales = () => {
   // Calculate totals safely
   const totalSales = sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
 
+  // Tabs for all/credit sales
+  const [activeTab, setActiveTab] = useState<'all' | 'credit'>('all')
+  // Filter credit sales
+  const creditSales = sales.filter(sale => sale.payments && sale.payments.some(p => p.payment_method === 'credit'))
+  const totalCredit = creditSales.reduce((sum, sale) => {
+    const credit = sale.payments.find(p => p.payment_method === 'credit')
+    return sum + (credit ? Number(credit.amount) : 0)
+  }, 0)
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -77,9 +88,8 @@ const Sales = () => {
         throw new Error('Could not create print document');
       }
 
-      const subtotal = Number(sale.total_amount);
-      const vat = subtotal * 0.16; // 16% VAT
-      const total = subtotal; // Total is already including VAT
+      const total = Number(sale.total_amount);
+      const currency = businessSettings?.currency || 'KSH';
 
       doc.write(`
         <!DOCTYPE html>
@@ -94,7 +104,7 @@ const Sales = () => {
                 margin: 0;
                 padding: 10mm;
                 color: #000;
-                line-height: 1.5;
+                line-height: 1.4;
               }
               .receipt {
                 width: 72mm;
@@ -106,18 +116,20 @@ const Sales = () => {
                 padding-bottom: 3mm;
                 border-bottom: 1px dashed #000;
               }
-              .company-name {
-                font-size: 16pt;
-                font-weight: bold;
+              .header h2 {
                 margin: 0;
+                font-size: 14pt;
               }
-              .company-details {
+              .header p {
+                margin: 1mm 0;
                 font-size: 8pt;
-                margin: 2mm 0;
               }
               .receipt-info {
                 margin: 3mm 0;
                 font-size: 9pt;
+              }
+              .receipt-info p {
+                margin: 1mm 0;
               }
               .items {
                 width: 100%;
@@ -132,16 +144,13 @@ const Sales = () => {
               .items .amount {
                 text-align: right;
               }
-              .totals {
+              .total-section {
                 margin-top: 3mm;
                 padding-top: 3mm;
                 border-top: 1px solid #000;
-                font-size: 9pt;
-              }
-              .totals p {
-                display: flex;
-                justify-content: space-between;
-                margin: 1mm 0;
+                font-size: 10pt;
+                font-weight: bold;
+                text-align: right;
               }
               .footer {
                 margin-top: 5mm;
@@ -155,18 +164,20 @@ const Sales = () => {
           <body>
             <div class="receipt">
               <div class="header">
-                <p class="company-name">DAIRY SHOP</p>
-                <p class="company-details">
-                  123 Main Street<br>
-                  Nairobi, Kenya<br>
-                  Tel: +254 123 456 789
-                </p>
+                <h2>${businessSettings?.business_name || 'SALES RECEIPT'}</h2>
+                ${businessSettings?.address ? `<p>${businessSettings.address}</p>` : ''}
+                ${businessSettings?.phone ? `<p>Tel: ${businessSettings.phone}</p>` : ''}
+                ${businessSettings?.email ? `<p>Email: ${businessSettings.email}</p>` : ''}
+                ${businessSettings?.tax_id ? `<p>Tax ID: ${businessSettings.tax_id}</p>` : ''}
               </div>
 
               <div class="receipt-info">
                 <p>Receipt #: ${sale.id}</p>
+                ${sale.created_by_username ? `<p>You were served by: ${sale.created_by_username}</p>` : ''}
                 <p>Date: ${format(new Date(sale.created_at), 'PPpp')}</p>
-                <p>Payment: ${sale.payment_method.toUpperCase()}</p>
+                <p>Payment: ${sale.payments && sale.payments.length > 0 
+                  ? sale.payments.map(p => p.payment_method.toUpperCase()).join(', ')
+                  : 'N/A'}</p>
               </div>
 
               <table class="items">
@@ -174,7 +185,6 @@ const Sales = () => {
                   <tr>
                     <th>Item</th>
                     <th>Qty</th>
-                    <th class="amount">Price</th>
                     <th class="amount">Total</th>
                   </tr>
                 </thead>
@@ -183,25 +193,20 @@ const Sales = () => {
                     <tr>
                       <td>${item.product_name}</td>
                       <td>${item.quantity}</td>
-                      <td class="amount">${Number(item.unit_price).toFixed(2)}</td>
                       <td class="amount">${(item.quantity * Number(item.unit_price)).toFixed(2)}</td>
                     </tr>
                   `).join('')}
                 </tbody>
               </table>
 
-              <div class="totals">
-                <p><span>Subtotal:</span> <span>Ksh ${(subtotal - vat).toFixed(2)}</span></p>
-                <p><span>VAT (16%):</span> <span>Ksh ${vat.toFixed(2)}</span></p>
-                <p style="font-weight: bold;">
-                  <span>TOTAL:</span> <span>Ksh ${total.toFixed(2)}</span>
-                </p>
+              <div class="total-section">
+                <p>TOTAL (${currency}): ${total.toFixed(2)}</p>
               </div>
 
               <div class="footer">
                 <p>Thank you for your business!</p>
-                <p>Please come again</p>
-                <p>${format(new Date(), 'PPpp')}</p>
+                <p style="margin-top: 3mm; font-weight: bold;">POS designed by EL-Technologies</p>
+                <p style="margin-top: 2mm; font-size: 7pt; color: #666;">${format(new Date(), 'PPpp')}</p>
               </div>
             </div>
           </body>
@@ -278,31 +283,46 @@ const Sales = () => {
         </div>
       </div>
 
-      {/* Sales Table */}
+      {/* Tabs for All Sales / Credit Sales */}
+      <div className="flex gap-4 mb-4">
+        <button
+          className={`px-4 py-2 rounded-lg font-bold ${activeTab === 'all' ? 'bg-orange-500 text-white' : 'bg-dark-700 text-gray-300'}`}
+          onClick={() => setActiveTab('all')}
+        >
+          All Sales
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg font-bold ${activeTab === 'credit' ? 'bg-orange-500 text-white' : 'bg-dark-700 text-gray-300'}`}
+          onClick={() => setActiveTab('credit')}
+        >
+          Credit Sales
+        </button>
+      </div>
+
+      {activeTab === 'credit' && (
+        <div className="mb-4 p-4 bg-dark-900 rounded-lg border border-dark-700 flex items-center justify-between">
+          <span className="text-lg font-bold text-orange-400">Total Credit Outstanding:</span>
+          <span className="text-2xl font-bold text-red-400">Ksh {totalCredit.toLocaleString()}</span>
+        </div>
+      )}
+
       <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-dark-900">
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Receipt #
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Payment Method
-                </th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Receipt #</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Cashier</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Payment Method</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Total</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Paid</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Balance</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-700">
-              {sales.map((sale) => (
+              {(activeTab === 'all' ? sales : creditSales).map((sale) => (
                 <tr 
                   key={sale.id}
                   className="hover:bg-dark-700 transition-colors cursor-pointer"
@@ -311,20 +331,19 @@ const Sales = () => {
                     setIsDetailsOpen(true)
                   }}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-white">
-                    #{sale.id}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-300">
-                    {format(new Date(sale.created_at), 'PPp')}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-white">#{sale.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-300">{format(new Date(sale.created_at), 'PPp')}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-orange-400 font-medium">{sale.created_by_username}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2 py-1 text-xs font-medium rounded-full bg-primary-500/20 text-primary-400">
-                      {sale.payment_method.toUpperCase()}
+                      {sale.payments && sale.payments.length > 0 
+                        ? sale.payments.map(p => p.payment_method.toUpperCase()).join(', ')
+                        : 'N/A'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-white">
-                    Ksh {Number(sale.total_amount).toLocaleString()}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-white">Ksh {Number(sale.total_amount).toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-green-400">Ksh {Number(sale.amount_paid).toLocaleString()}</td>
+                  <td className={`px-6 py-4 whitespace-nowrap text-right font-medium ${Number(sale.balance_due) > 0 ? 'text-red-400' : 'text-gray-400'}`}>Ksh {Number(sale.balance_due).toLocaleString()}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <button
                       onClick={(e) => {
@@ -381,18 +400,31 @@ const Sales = () => {
                     <div className="bg-dark-900 p-4 rounded-lg">
                       <p className="text-gray-400 text-sm">Payment Method</p>
                       <p className="text-white mt-1">
-                        {selectedSale.payment_method.toUpperCase()}
+                        {selectedSale.payments && selectedSale.payments.length > 0 
+                          ? selectedSale.payments.map(p => p.payment_method.toUpperCase()).join(', ')
+                          : 'N/A'}
                       </p>
                     </div>
                     <div className="bg-dark-900 p-4 rounded-lg">
                       <p className="text-gray-400 text-sm">Total Amount</p>
-                      <p className="text-white mt-1">
+                      <p className="text-white mt-1 font-bold">
                         Ksh {Number(selectedSale.total_amount).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="bg-dark-900 p-4 rounded-lg">
+                      <p className="text-gray-400 text-sm">Amount Paid</p>
+                      <p className="text-green-400 mt-1 font-bold">
+                        Ksh {Number(selectedSale.amount_paid).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="bg-dark-900 p-4 rounded-lg">
+                      <p className="text-gray-400 text-sm">Balance Due</p>
+                      <p className={`${Number(selectedSale.balance_due) > 0 ? 'text-red-400' : 'text-gray-400'} mt-1 font-bold`}>
+                        Ksh {Number(selectedSale.balance_due).toLocaleString()}
                       </p>
                     </div>
                   </div>
 
-                  {/* Sale Details Modal Items Table */}
                   <div className="bg-dark-900 rounded-lg overflow-hidden">
                     <table className="w-full">
                       <thead>

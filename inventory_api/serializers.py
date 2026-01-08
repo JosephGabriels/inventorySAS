@@ -1,15 +1,36 @@
+# Customer serializer
 from rest_framework import serializers
+from .models import Customer
+
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ['id', 'name', 'email', 'phone', 'address', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 from django.contrib.auth.password_validation import validate_password
 from .models import (
     User, Product, Category, Supplier,
-    StockMovement, Sale, SaleItem, BusinessSettings
+    StockMovement, Sale, SaleItem, BusinessSettings, Payment, Terminal
 )
 
 class UserSerializer(serializers.ModelSerializer):
+    is_admin = serializers.SerializerMethodField()
+    is_manager = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'role', 'first_name', 'last_name', 'force_password_change')
-        read_only_fields = ('id',)
+        fields = ('id', 'username', 'email', 'role', 'first_name', 'last_name', 
+                 'is_active', 'is_admin', 'is_manager', 'force_password_change', 
+                 'date_joined', 'last_login')
+        read_only_fields = ('id', 'date_joined', 'last_login', 'is_admin', 'is_manager')
+    
+    def get_is_admin(self, obj):
+        """Return computed is_admin property"""
+        return obj.is_admin
+    
+    def get_is_manager(self, obj):
+        """Return computed is_manager property"""
+        return obj.is_manager
 
 class BusinessSettingsSerializer(serializers.ModelSerializer):
     updated_by_username = serializers.CharField(source='updated_by.username', read_only=True)
@@ -79,12 +100,32 @@ class UserManagementSerializer(serializers.ModelSerializer):
         write_only=True, required=False, 
         validators=[validate_password]
     )
+    is_admin = serializers.SerializerMethodField()
+    is_manager = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = ('id', 'username', 'password', 'email', 
-                 'first_name', 'last_name', 'role', 'is_active')
-        read_only_fields = ('id',)
+                 'first_name', 'last_name', 'role', 'is_active',
+                 'is_admin', 'is_manager', 'date_joined', 'last_login')
+        read_only_fields = ('id', 'date_joined', 'last_login', 'is_admin', 'is_manager')
+    
+    def get_is_admin(self, obj):
+        """Return computed is_admin property"""
+        return obj.is_admin
+    
+    def get_is_manager(self, obj):
+        """Return computed is_manager property"""
+        return obj.is_manager
+    
+    def validate_role(self, value):
+        """Validate role is one of the allowed choices"""
+        valid_roles = ['admin', 'manager', 'staff']
+        if value not in valid_roles:
+            raise serializers.ValidationError(
+                f"Invalid role. Must be one of: {', '.join(valid_roles)}"
+            )
+        return value
         
     def update(self, instance, validated_data):
         # Handle password separately
@@ -100,6 +141,20 @@ class UserManagementSerializer(serializers.ModelSerializer):
             
         instance.save()
         return instance
+    
+    def create(self, validated_data):
+        # Remove password from validated_data
+        password = validated_data.pop('password', None)
+        
+        # Create user
+        user = User.objects.create(**validated_data)
+        
+        # Set password if provided
+        if password:
+            user.set_password(password)
+            user.save()
+        
+        return user
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -166,6 +221,11 @@ class AIForecastSerializer(serializers.Serializer):
     confidence_score = serializers.FloatField()
     suggested_restock_date = serializers.DateField()
 
+class TerminalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Terminal
+        fields = '__all__'
+
 class SaleItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     total_price = serializers.SerializerMethodField()
@@ -204,29 +264,76 @@ class SaleItemSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"Product with ID {product_id} does not exist")
         return data
 
+class PaymentSerializer(serializers.ModelSerializer):
+    created_by_username = serializers.SerializerMethodField()
+    customer_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Payment
+        fields = (
+            'id', 'sale', 'payment_method', 'amount', 'notes',
+            'terminal', 'created_at', 'created_by', 'created_by_username',
+            'customer_name'
+        )
+        read_only_fields = ('id', 'sale', 'created_at', 'created_by')
+
+    def get_created_by_username(self, obj):
+        return obj.created_by.username if obj.created_by else 'System'
+    
+    def get_customer_name(self, obj):
+        if obj.sale and obj.sale.customer:
+            return obj.sale.customer.name
+        return None
+
 class SaleSerializer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True)
-    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    payments = PaymentSerializer(many=True, required=False)
+    created_by_username = serializers.SerializerMethodField()
+    terminal_name = serializers.CharField(source='terminal.name', read_only=True)
+    balance_due = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    customer_name = serializers.CharField(source='customer.name', read_only=True, allow_null=True)
+    customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = Sale
         fields = (
-            'id', 'payment_method', 'total_amount',
+            'id', 'order_number', 'status', 'total_amount', 'amount_paid', 'balance_due',
+            'terminal', 'terminal_name', 'customer', 'customer_name',
             'created_at', 'created_by', 'created_by_username',
-            'items'
+            'items', 'payments'
         )
-        read_only_fields = ('id', 'created_at', 'created_by')
+        read_only_fields = ('id', 'order_number', 'created_at', 'created_by', 'amount_paid', 'status')
+
+    def get_created_by_username(self, obj):
+        return obj.created_by.username if obj.created_by else 'System'
+
+    def validate_terminal(self, value):
+        if value and not value.is_active:
+            raise serializers.ValidationError("This terminal is inactive.")
+        return value
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')
+        payments_data = validated_data.pop('payments', [])
         request = self.context.get('request')
-        
-        # We don't set created_by at all - let the model handle it with its default
-        # This allows anonymous users to create sales
-        
+        if request and request.user and request.user.is_authenticated:
+            validated_data['created_by'] = request.user
         sale = Sale.objects.create(**validated_data)
-        
         for item_data in items_data:
             SaleItem.objects.create(sale=sale, **item_data)
-        
+        # Only record up to the total amount as payment (excess is not recorded, only shown as change)
+        total_to_record = sale.total_amount
+        for payment_data in payments_data:
+            if total_to_record <= 0:
+                break
+            payment_data['sale'] = sale
+            # Automatically assign the same terminal as the sale if not provided
+            if not payment_data.get('terminal'):
+                payment_data['terminal'] = sale.terminal
+            if request and request.user and request.user.is_authenticated:
+                payment_data['created_by'] = request.user
+            payment_amount = min(payment_data['amount'], total_to_record)
+            payment_data['amount'] = payment_amount
+            Payment.objects.create(**payment_data)
+            total_to_record -= payment_amount
         return sale

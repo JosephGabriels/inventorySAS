@@ -3,6 +3,21 @@ from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 from django.utils.translation import gettext_lazy as _
 
+# Customer model for loyal/credit customers
+class Customer(models.Model):
+    name = models.CharField(max_length=100)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    address = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+
 class User(AbstractUser):
     """Custom user model for role-based access"""
     ROLE_CHOICES = (
@@ -16,6 +31,16 @@ class User(AbstractUser):
     class Meta:
         verbose_name = _('user')
         verbose_name_plural = _('users')
+    
+    @property
+    def is_admin(self):
+        """Computed property for backward compatibility"""
+        return self.role == 'admin'
+    
+    @property
+    def is_manager(self):
+        """Check if user is admin or manager"""
+        return self.role in ['admin', 'manager']
 
 class BusinessSettings(models.Model):
     """Store business settings like name, logo, and contact info"""
@@ -131,18 +156,94 @@ class StockMovement(models.Model):
     class Meta:
         ordering = ['-created_at']
 
+class Terminal(models.Model):
+    """Point of Sale terminal/register"""
+    name = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+
 class Sale(models.Model):
     """Track sales transactions"""
+    STATUS_CHOICES = (
+        ('paid', 'Fully Paid'),
+        ('partial', 'Partially Paid'),
+        ('pending', 'Pending'),
+    )
+    
+
+    order_number = models.CharField(max_length=16, unique=True, blank=True, null=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='paid')
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    terminal = models.ForeignKey(Terminal, on_delete=models.PROTECT, related_name='sales', null=True)
+    customer = models.ForeignKey('Customer', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales')
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='sales_created', null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.order_number:
+            import random, string
+            self.order_number = 'PD' + ''.join(random.choices(string.digits, k=6))
+        super().save(*args, **kwargs)
+
+    @property
+    def balance_due(self):
+        return self.total_amount - self.amount_paid
+
+    def __str__(self):
+        return f"Sale #{self.id} - {self.status} by {self.created_by.username if self.created_by else 'Unknown'}"
+
+    class Meta:
+        ordering = ['-created_at']
+
+class Payment(models.Model):
+    """Track individual payments for a sale"""
     PAYMENT_METHODS = (
         ('cash', 'Cash'),
+        ('mpesa', 'MPESA'),
+        ('equity', 'Equity'),
+        ('credit', 'Credit'),
         ('card', 'Card'),
         ('mobile', 'Mobile Payment'),
     )
     
+    sale = models.ForeignKey(Sale, related_name='payments', on_delete=models.CASCADE)
     payment_method = models.CharField(max_length=10, choices=PAYMENT_METHODS)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    notes = models.TextField(blank=True)
+    terminal = models.ForeignKey(Terminal, on_delete=models.PROTECT, related_name='payments', null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='payments_created', null=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Update sale amount_paid and status
+        sale = self.sale
+        # Exclude credit payments from amount_paid as they are not "at hand"
+        total_paid = sum(p.amount for p in sale.payments.exclude(payment_method='credit'))
+        sale.amount_paid = total_paid
+        
+        # Determine status
+        has_credit = sale.payments.filter(payment_method='credit').exists()
+        
+        if total_paid >= sale.total_amount:
+            sale.status = 'paid'
+        elif total_paid > 0 or has_credit:
+            sale.status = 'partial'
+        else:
+            sale.status = 'pending'
+            
+        sale.save(update_fields=["amount_paid", "status"])
+
+    def __str__(self):
+        return f"Payment of {self.amount} for Sale #{self.sale.id} ({self.payment_method})"
 
     class Meta:
         ordering = ['-created_at']

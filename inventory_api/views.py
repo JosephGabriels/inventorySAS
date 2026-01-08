@@ -1,3 +1,57 @@
+# Customer API ViewSet
+from rest_framework import viewsets, views, permissions, status, serializers
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.decorators import action, permission_classes, api_view
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from .models import Customer
+from .serializers import CustomerSerializer
+
+class CustomerViewSet(viewsets.ModelViewSet):
+    queryset = Customer.objects.all().order_by('name')
+    serializer_class = CustomerSerializer
+    permission_classes = [IsAuthenticated]
+
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import update_session_auth_hash, get_user_model
+from django.db.models import Sum, Count, F, ExpressionWrapper, DecimalField, Avg
+from django.db.models.functions import TruncDate, TruncMonth, TruncYear
+from django.utils import timezone
+from datetime import timedelta, datetime
+import pandas as pd
+import numpy as np
+
+class CashReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        if not start_date or not end_date:
+            return Response({'detail': 'start_date and end_date are required.'}, status=400)
+
+        payments = Payment.objects.filter(
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date
+        )
+
+        # Exclude credit from total amount as it is not at hand
+        total_amount = payments.exclude(payment_method='credit').aggregate(total=Sum('amount'))['total'] or 0
+
+        summary = payments.values('payment_method').annotate(
+            total_amount=Sum('amount'),
+            count=Count('id')
+        )
+
+        payment_list = payments.select_related('created_by').values(
+            'id', 'amount', 'payment_method', 'created_at', 'created_by__username'
+        )
+
+        return Response({
+            'total_amount': total_amount,
+            'summary': list(summary),
+            'payments': list(payment_list)
+        })
 from rest_framework import viewsets, views, permissions, status, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action, permission_classes, api_view
@@ -13,7 +67,7 @@ import numpy as np
 
 from .models import (
     User, Product, Category, Supplier,
-    StockMovement, Sale, SaleItem, BusinessSettings
+    StockMovement, Sale, SaleItem, BusinessSettings, Payment, Terminal
 )
 from .serializers import (
     UserSerializer, ProductSerializer, CategorySerializer,
@@ -21,7 +75,7 @@ from .serializers import (
     DailyStatsSerializer, MonthlyStatsSerializer, AIForecastSerializer,
     SaleSerializer, SaleItemSerializer,
     RegisterSerializer, UserManagementSerializer, BusinessSettingsSerializer,
-    ChangePasswordSerializer
+    ChangePasswordSerializer, PaymentSerializer, TerminalSerializer
 )
 
 # Custom permissions
@@ -87,6 +141,63 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
     
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly])
+    def toggle_active(self, request, pk=None):
+        """
+        Toggle the is_active status of a user
+        """
+        user = self.get_object()
+        
+        # Prevent admin from deactivating themselves
+        if user.id == request.user.id:
+            return Response(
+                {'error': 'You cannot deactivate your own account'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Toggle the is_active status
+        user.is_active = not user.is_active
+        user.save()
+        
+        serializer = UserSerializer(user)
+        return Response({
+            'message': f'User {"activated" if user.is_active else "deactivated"} successfully',
+            'user': serializer.data
+        })
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOnly])
+    def change_role(self, request, pk=None):
+        """
+        Change the role of a user
+        """
+        user = self.get_object()
+        new_role = request.data.get('role')
+        
+        # Validate role
+        valid_roles = ['admin', 'manager', 'staff']
+        if new_role not in valid_roles:
+            return Response(
+                {'error': f'Invalid role. Must be one of: {", ".join(valid_roles)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Prevent admin from demoting themselves
+        if user.id == request.user.id and new_role != 'admin':
+            return Response(
+                {'error': 'You cannot change your own role'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update role
+        user.role = new_role
+        user.save()
+        
+        serializer = UserSerializer(user)
+        return Response({
+            'message': f'User role changed to {new_role} successfully',
+            'user': serializer.data
+        })
+    
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def change_password(self, request):
         """
@@ -119,9 +230,13 @@ class UserViewSet(viewsets.ModelViewSet):
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# Standalone change_password function for backward compatibility
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def change_password(request):
+def change_password_standalone(request):
+    """
+    Standalone password change endpoint for backward compatibility
+    """
     user = request.user
     data = request.data
 
@@ -198,35 +313,117 @@ class StockMovementViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user)
 
 class SaleViewSet(viewsets.ModelViewSet):
-    queryset = Sale.objects.all()
+    queryset = Sale.objects.all().select_related('customer', 'created_by', 'terminal').prefetch_related('items', 'payments')
     serializer_class = SaleSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by date range if provided
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        
+        if start_date and end_date:
+            from django.utils import timezone
+            from datetime import datetime
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end = datetime.strptime(end_date, '%Y-%m-%d').date()
+                queryset = queryset.filter(created_at__date__range=[start, end])
+            except ValueError:
+                pass
+        
+        return queryset.order_by('-created_at')
+
     def create(self, request, *args, **kwargs):
         try:
-            print(f"Received sale data: {request.data}")  # Log received data
             serializer = self.get_serializer(data=request.data)
             if not serializer.is_valid():
-                print(f"Validation errors: {serializer.errors}")  # Log validation errors
                 return Response({'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
             
             self.perform_create(serializer)
             headers = self.get_success_headers(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         except serializers.ValidationError as e:
-            print(f"Validation error: {str(e)}")  # Log validation error
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            print(f"Error creating sale: {str(e)}")  # Log the error
             return Response({'error': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def perform_create(self, serializer):
-        print("Performing create...")  # Log create operation
-        
         # Set created_by from authenticated user
         sale = serializer.save(created_by=self.request.user)
+
+class PaymentViewSet(viewsets.ModelViewSet):
+    queryset = Payment.objects.all().select_related('sale__customer', 'created_by', 'sale__terminal', 'terminal')
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+class TerminalViewSet(viewsets.ModelViewSet):
+    queryset = Terminal.objects.all()
+    serializer_class = TerminalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Terminal.objects.all()
+        active_only = self.request.query_params.get('active_only')
+        if active_only:
+            queryset = queryset.filter(is_active=True)
+        return queryset
+
+class CashReportView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Allow filtering by date range
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+        
+        if not start_date_str:
+            start_date = timezone.now().date()
+        else:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                start_date = timezone.now().date()
             
-        print(f"Sale created: {sale.id}")  # Log created sale ID
+        if not end_date_str:
+            end_date = timezone.now().date()
+        else:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                end_date = timezone.now().date()
+
+        payments = Payment.objects.filter(
+            created_at__date__range=[start_date, end_date]
+        ).select_related('sale__customer', 'created_by', 'sale__terminal', 'terminal')
+        
+        # Aggregate by payment method
+        report = payments.values('payment_method').annotate(
+            total_amount=Sum('amount'),
+            count=Count('id')
+        )
+        
+        # Use serializer to get individual payments with customer info
+        from .serializers import PaymentSerializer
+        individual_payments = PaymentSerializer(payments, many=True).data
+        
+        # Calculate totals - include all payment methods
+        total_amount = sum(p['total_amount'] for p in report)
+        total_cash = sum(p['total_amount'] for p in report if p['payment_method'] == 'cash')
+        
+        return Response({
+            'start_date': start_date,
+            'end_date': end_date,
+            'summary': list(report),
+            'payments': individual_payments,
+            'total_amount': total_amount,
+            'total_cash': total_cash
+        })
 
 class DailyStatsView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -410,11 +607,9 @@ class DairyStatsView(views.APIView):
             end_date = timezone.now().date()
             start_date = end_date - timedelta(days=days-1)
         
-        print(f"Generating dairy stats from {start_date} to {end_date} ({days} days)")
         
         # Get ALL products to ensure we don't miss any sales
         all_products = Product.objects.all()
-        print(f"Total products in system: {all_products.count()}")
         
         # Step 1: Identify dairy-related categories and products
         dairy_categories = []
@@ -426,7 +621,6 @@ class DairyStatsView(views.APIView):
             for category in categories:
                 if category not in dairy_categories:
                     dairy_categories.append(category)
-                    print(f"Found dairy category: {category.name} (ID: {category.id})")
         
         # Then look for products with dairy-related names
         product_name_filter = r'(?i)(' + '|'.join(dairy_keywords) + ')'
@@ -436,21 +630,14 @@ class DairyStatsView(views.APIView):
         for product in dairy_named_products:
             if product.category and product.category not in dairy_categories:
                 dairy_categories.append(product.category)
-                print(f"Added category from product name: {product.category.name} (from product: {product.name})")
         
         # If we still don't have any dairy categories, include all categories
         # This ensures we get data, even if imperfect, rather than zeros
         if not dairy_categories:
-            print("No dairy categories found. Including all categories for data.")
             dairy_categories = list(Category.objects.all())
             
         # Get all products from the identified categories
         dairy_products = Product.objects.filter(category__in=dairy_categories)
-        print(f"Found {dairy_products.count()} dairy products in {len(dairy_categories)} categories")
-        
-        # Print all dairy product names for debugging
-        for product in dairy_products[:10]:  # Limit to 10 to avoid console spam
-            print(f"Dairy product: {product.name} (ID: {product.id}, Category: {product.category.name if product.category else 'None'})")
         
         # Get sales data: First try SaleItem
         # This approach directly uses the Sale and SaleItem models which should be more reliable
@@ -459,16 +646,14 @@ class DairyStatsView(views.APIView):
         try:
             # Get all sales in the date range
             sales = Sale.objects.filter(created_at__date__range=[start_date, end_date])
-            print(f"Found {sales.count()} total sales in date range")
             
             # Get sale items for dairy products
             sale_items = SaleItem.objects.filter(
                 sale__in=sales,
                 product__in=dairy_products
             )
-            print(f"Found {sale_items.count()} sale items for dairy products")
         except Exception as e:
-            print(f"Error fetching sale items: {e}")
+            pass
         
         # If we have sale items, use them for the statistics
         if sale_items:
@@ -504,11 +689,10 @@ class DairyStatsView(views.APIView):
                 product_stats = list(product_summary.values())
                 product_stats.sort(key=lambda x: x['total_revenue'], reverse=True)
                 
-                print(f"Calculated from SaleItems: Revenue: {total_revenue}, Profit: {total_profit}, Quantity: {total_quantity}")
-                
+
             except Exception as e:
-                print(f"Error calculating sale item statistics: {e}")
                 # Fallback to zero values if there's an error
+                pass
                 total_revenue = 0
                 total_cost = 0
                 total_quantity = 0
@@ -517,14 +701,12 @@ class DairyStatsView(views.APIView):
                 
         # Fallback to StockMovements if no SaleItems were found
         else:
-            print("No sale items found. Falling back to StockMovements...")
             # Get stock movements for the dairy products in the date range
             movements = StockMovement.objects.filter(
                 product__in=dairy_products,
                 created_at__date__range=[start_date, end_date],
                 movement_type='out'  # Look for any 'out' movements, not just sales
             )
-            print(f"Found {movements.count()} stock movements for dairy products")
             
             # If we have movements, calculate statistics
             if movements.exists():
@@ -554,19 +736,18 @@ class DairyStatsView(views.APIView):
                         )
                     ).order_by('-total_revenue')
                     
-                    print(f"Calculated from StockMovements: Revenue: {total_revenue}, Profit: {total_profit}, Quantity: {total_quantity}")
-                    
+
                 except Exception as e:
-                    print(f"Error calculating stock movement statistics: {e}")
                     # Fallback to zero values if there's an error
+                    pass
                     total_revenue = 0
                     total_cost = 0
                     total_quantity = 0
                     total_profit = 0
                     product_stats = []
             else:
-                print("No stock movements found either.")
                 # No data found
+                pass
                 total_revenue = 0
                 total_cost = 0
                 total_quantity = 0
@@ -575,23 +756,14 @@ class DairyStatsView(views.APIView):
         
         # If we still have no data, check if there are any sales at all
         if total_revenue == 0 and total_quantity == 0:
-            print("No dairy sales found. Checking if there are any sales in the system...")
             try:
                 all_sales = Sale.objects.filter(created_at__date__range=[start_date, end_date])
                 all_sale_items = SaleItem.objects.filter(sale__in=all_sales)
                 
                 if all_sales.exists():
-                    print(f"Found {all_sales.count()} total sales with {all_sale_items.count()} items, but none matched dairy products.")
-                    
-                    # For debugging, show what products were actually sold
-                    sold_products = Product.objects.filter(
-                        id__in=all_sale_items.values_list('product', flat=True).distinct()
-                    )
-                    print(f"Products sold in this period ({sold_products.count()}):")
-                    for product in sold_products[:10]:  # Limit to 10
-                        print(f"- {product.name} (Category: {product.category.name if product.category else 'None'})")
+                    pass
             except Exception as e:
-                print(f"Error checking overall sales: {e}")
+                pass
         
         # Return comprehensive response with debug info
         return Response({
@@ -765,6 +937,28 @@ class SalesAnalyticsView(views.APIView):
                 profit=Sum(
                     F('quantity') * (F('product__unit_price') - F('product__cost_price'))
                 )
+            ).order_by('-total_revenue')
+        elif group_by == 'date':
+            analytics = movements.annotate(
+                date=TruncDate('created_at')
+            ).values('date').annotate(
+                total_quantity=Sum('quantity'),
+                total_revenue=Sum(F('quantity') * F('product__unit_price')),
+                total_cost=Sum(F('quantity') * F('product__cost_price')),
+                profit=Sum(
+                    F('quantity') * (F('product__unit_price') - F('product__cost_price'))
+                )
+            ).order_by('date')
+        elif group_by == 'payment_method':
+            # Payments are separate from StockMovements, so we query Payment model
+            payments = Payment.objects.filter(
+                created_at__date__range=[start_date, end_date]
+            )
+            analytics = payments.values(
+                'payment_method'
+            ).annotate(
+                total_revenue=Sum('amount'),
+                count=Count('id')
             ).order_by('-total_revenue')
         else:
             return Response(

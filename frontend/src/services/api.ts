@@ -4,9 +4,7 @@ import type { Product } from '../hooks/useProducts'
 import { CategoryFormData, StockMovement } from '../types'
 
 // Update baseURL logic to handle production URLs
-const baseURL = import.meta.env.PROD 
-  ? 'https://inventorysas.onrender.com'  // Your production API URL
-  : import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 // Create an axios instance with the base URL
 const api = axios.create({
@@ -25,27 +23,15 @@ if (token) {
 // Add request interceptor for authorization and debugging
 api.interceptors.request.use(
   (config) => {
-    // Force production URL for all requests in production mode
-    if (import.meta.env.PROD) {
-      config.baseURL = 'https://inventorysas.onrender.com';
-    }
-    
     // Ensure all requests have the correct baseURL
     if (!config.baseURL) {
       config.baseURL = baseURL;
     }
     
-    // Add trailing slash if missing
-    if (config.url && !config.url.endsWith('/')) {
+    // Add trailing slash if missing and no query parameters
+    if (config.url && !config.url.includes('?') && !config.url.endsWith('/')) {
       config.url = `${config.url}/`;
     }
-    
-    console.log('API Request:', {
-      url: config.url,
-      method: config.method,
-      baseURL: config.baseURL,
-      fullUrl: `${config.baseURL}${config.url}`
-    });
     
     return config;
   },
@@ -58,11 +44,6 @@ api.interceptors.request.use(
 // Add response interceptor for token refresh and debugging
 api.interceptors.response.use(
   (response) => {
-    console.log('API Response:', {
-      url: response.config.url,
-      status: response.status,
-      data: response.data
-    })
     return response
   },
   async (error) => {
@@ -163,7 +144,12 @@ export interface UserData {
   role: 'admin' | 'manager' | 'staff';
   first_name: string;
   last_name: string;
-  force_password_change?: boolean;
+  is_active: boolean;
+  is_admin: boolean;  // Computed property from backend
+  is_manager: boolean;  // Computed property from backend
+  force_password_change: boolean;
+  date_joined: string;
+  last_login: string | null;
 }
 
 export interface TokenResponse {
@@ -229,6 +215,26 @@ export const deleteUser = async (id: number): Promise<void> => {
     await api.delete(`/api/users/${id}/`)
   } catch (error) {
     console.error('Delete User Error:', error)
+    throw error
+  }
+}
+
+export const toggleUserActive = async (id: number): Promise<UserData> => {
+  try {
+    const response = await api.post<{ message: string; user: UserData }>(`/api/users/${id}/toggle_active/`)
+    return response.data.user
+  } catch (error) {
+    console.error('Toggle User Active Error:', error)
+    throw error
+  }
+}
+
+export const changeUserRole = async (id: number, role: 'admin' | 'manager' | 'staff'): Promise<UserData> => {
+  try {
+    const response = await api.post<{ message: string; user: UserData }>(`/api/users/${id}/change_role/`, { role })
+    return response.data.user
+  } catch (error) {
+    console.error('Change User Role Error:', error)
     throw error
   }
 }
@@ -320,7 +326,6 @@ export const supplierAPI = {
   getAll: async (): Promise<Supplier[]> => {
     try {
       const response = await api.get('/api/suppliers/')
-      console.log('Suppliers response:', response.data)
       return response.data
     } catch (error) {
       console.error('Suppliers API Error:', error)
@@ -395,27 +400,71 @@ export const stockMovementAPI = {
   }
 }
 
+// Terminal API
+export interface Terminal {
+  id: number;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const terminalAPI = {
+  getAll: async (params?: { active_only?: boolean }) => {
+    const response = await api.get<Terminal[]>('/api/terminals/', { params });
+    return response.data;
+  },
+  getOne: (id: number) => api.get<Terminal>(`/api/terminals/${id}/`),
+  create: (data: Partial<Terminal>) => api.post<Terminal>('/api/terminals/', data),
+  update: (id: number, data: Partial<Terminal>) => api.patch<Terminal>(`/api/terminals/${id}/`, data),
+  delete: (id: number) => api.delete(`/api/terminals/${id}/`)
+};
+
 // Sales
 export interface SaleItem {
+  id?: number;
+  product?: number;
   product_id: number;
+  product_name?: string;
   quantity: number;
   unit_price: number;
+  total_price?: number;
+}
+
+export interface Payment {
+  id?: number;
+  sale?: number;
+  payment_method: 'cash' | 'card' | 'mobile';
+  amount: number;
+  notes?: string;
+  created_at?: string;
+  created_by_username?: string;
 }
 
 export interface Sale {
   id: number;
-  payment_method: 'cash' | 'card' | 'mobile';
+  status: 'paid' | 'partial' | 'pending';
   total_amount: number;
+  amount_paid: number;
+  balance_due: number;
   created_at: string;
   created_by: number | null;
   created_by_username: string;
   items: SaleItem[];
+  payments: Payment[];
+  customer?: {
+    id: number;
+    name: string;
+    phone?: string;
+    email?: string;
+  } | null;
 }
 
 export interface CreateSaleData {
-  payment_method: 'cash' | 'card' | 'mobile';
   total_amount: number;
+  terminal?: number;
   items: SaleItem[];
+  payments: Omit<Payment, 'id' | 'sale' | 'created_at' | 'created_by_username'>[];
 }
 
 // Add this interface for print data
@@ -429,9 +478,14 @@ export interface PrintReceiptData {
     quantity: number;
   }>;
   total_amount: number;
+  amount_paid?: number;
+  balance_due?: number;
   payment_method: string;
+  payments?: Payment[];
   created_at: string;
   receipt_number?: string;
+  cashier_name?: string;
+  businessSettings?: BusinessSettings;
 }
 
 export const salesAPI = {
@@ -475,9 +529,11 @@ export const salesAPI = {
         throw new Error('Could not create print document');
       }
 
-      const subtotal = Number(saleData.total_amount) || 0;
-      const vat = subtotal * 0.16;
-      const total = subtotal + vat;
+      const total = Number(saleData.total_amount) || 0;
+      const amountPaid = Number(saleData.amount_paid) || total;
+      const balanceDue = Number(saleData.balance_due) || 0;
+      const settings = saleData.businessSettings;
+      const currency = settings?.currency || 'KSH';
 
       const formattedItems = saleData.items.map(item => ({
         ...item,
@@ -488,6 +544,38 @@ export const salesAPI = {
         quantity: Number(item.quantity) || 0
       }));
 
+      // VAT calculations
+      const VAT_RATE = 0.16;
+      const vatable = total / (1 + VAT_RATE);
+      const vatAmt = total - vatable;
+      // Amount in words helper
+      function numberToWords(num) {
+        // Simple version for Ksh only
+        const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+        const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+        if (num === 0) return "Zero";
+        if (num < 20) return a[num];
+        if (num < 100) return b[Math.floor(num / 10)] + (num % 10 ? " " + a[num % 10] : "");
+        if (num < 1000) return a[Math.floor(num / 100)] + " Hundred" + (num % 100 ? " " + numberToWords(num % 100) : "");
+        if (num < 1000000) return numberToWords(Math.floor(num / 1000)) + " Thousand" + (num % 1000 ? " " + numberToWords(num % 1000) : "");
+        return num.toString();
+      }
+      const amountWords = numberToWords(Math.round(total)) + ' Shillings Only';
+      // Payment lines
+      const paymentLines = saleData.payments && saleData.payments.length > 0
+        ? saleData.payments.map(p => `<tr><td colspan="2">Tendered (${p.payment_method.toUpperCase()})</td><td style="text-align:right;">${Number(p.amount).toFixed(2)}</td></tr>`).join('')
+        : `<tr><td colspan="2">Tendered (${saleData.payment_method.toUpperCase()})</td><td style="text-align:right;">${amountPaid.toFixed(2)}</td></tr>`;
+      // Change line
+      const change = amountPaid - total;
+      const changeLine = change > 0 ? `<tr><td colspan="2">Change</td><td style="text-align:right;">${change.toFixed(2)}</td></tr>` : '';
+      // POS/Receipt/PIN
+      const posNumber = saleData.terminal ? saleData.terminal : 'N/A';
+      const receiptNo = saleData.receipt_number || saleData.id;
+      const pin = settings?.tax_id || 'N/A';
+      // Tagline
+      const tagline = settings?.tagline || 'Where quality meets affordability';
+      // eTIMS signature placeholder
+      const etimsSig = 'RCPT-XXXXXX...';
       doc.write(`
         <!DOCTYPE html>
         <html>
@@ -496,49 +584,70 @@ export const salesAPI = {
             <title>Sales Receipt</title>
             <style>
               @page { size: 80mm 297mm; margin: 0; }
-              body { 
-                font-family: 'Courier New', monospace;
-                margin: 0;
-                padding: 10mm;
-                color: #000;
-              }
+              body { font-family: 'Courier New', monospace; margin: 0; padding: 10mm; color: #000; line-height: 1.4; }
               .receipt { width: 70mm; margin: 0 auto; }
-              .header { text-align: center; margin-bottom: 5mm; }
-              .items { width: 100%; margin: 5mm 0; }
-              .items th, .items td { padding: 1mm; text-align: left; }
-              .total { text-align: right; margin-top: 5mm; }
+              .header { text-align: center; margin-bottom: 2mm; border-bottom: 1px dashed #000; padding-bottom: 2mm; }
+              .header h2 { margin: 0; font-size: 14pt; }
+              .header p { margin: 1mm 0; font-size: 8pt; }
+              .tagline { font-size: 9pt; margin-bottom: 2mm; }
+              .meta { font-size: 8pt; margin-bottom: 2mm; }
+              .meta span { margin-right: 8px; }
+              .items { width: 100%; margin: 2mm 0; border-collapse: collapse; font-size: 9pt; }
+              .items th, .items td { padding: 1mm 1mm; }
+              .items th { border-bottom: 1px solid #000; text-align: left; }
+              .items td { border-bottom: 1px dotted #ccc; }
+              .totals { margin-top: 2mm; font-size: 10pt; }
+              .totals td { padding: 1mm 1mm; }
+              .footer { margin-top: 4mm; text-align: center; font-size: 8pt; border-top: 1px dashed #000; padding-top: 2mm; }
+              .etims { font-size: 7pt; color: #666; margin-top: 2mm; }
             </style>
           </head>
           <body>
             <div class="receipt">
               <div class="header">
-                <h2>Sales Receipt</h2>
-                <p>Receipt #: ${saleData.receipt_number || saleData.id}</p>
-                <p>Date: ${new Date(saleData.created_at).toLocaleString()}</p>
-                <p>Payment: ${saleData.payment_method.toUpperCase()}</p>
+                <h2>${settings?.business_name || 'SALES RECEIPT'}</h2>
+                ${settings?.address ? `<p>${settings.address}</p>` : ''}
+                ${settings?.phone ? `<p>Tel: ${settings.phone}</p>` : ''}
+                ${settings?.email ? `<p>${settings.email}</p>` : ''}
+                <p class="tagline">${tagline}</p>
               </div>
-              
+              <div class="meta">
+                <span><b>POS:</b> ${posNumber}</span>
+                <span>${new Date(saleData.created_at || Date.now()).toLocaleString()}</span><br/>
+                <span><b>Receipt:</b> ${receiptNo}</span><br/>
+                <span><b>PIN:</b> ${pin}</span>
+              </div>
               <table class="items">
-                <tr>
-                  <th>Item</th>
-                  <th>Qty</th>
-                  <th>Price</th>
-                  <th>Total</th>
-                </tr>
-                ${formattedItems.map(item => `
-                  <tr>
-                    <td>${item.product.name}</td>
-                    <td>${item.quantity}</td>
-                    <td>${item.product.unit_price.toFixed(2)}</td>
-                    <td>${(item.quantity * item.product.unit_price).toFixed(2)}</td>
-                  </tr>
-                `).join('')}
+                <thead>
+                  <tr><th>DESCRIPTION</th><th>QTY</th><th style="text-align:right;">EXT</th></tr>
+                </thead>
+                <tbody>
+                  ${formattedItems.map(item => `
+                    <tr>
+                      <td>${item.product.name}</td>
+                      <td>${item.quantity}</td>
+                      <td style="text-align:right;">${(item.quantity * item.product.unit_price).toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
               </table>
-              
-              <div class="total">
-                <p>Subtotal: ${subtotal.toFixed(2)}</p>
-                <p>VAT (16%): ${vat.toFixed(2)}</p>
-                <p><strong>Total: ${total.toFixed(2)}</strong></p>
+              <table class="totals" style="width:100%;">
+                <tr><td>Subtotal</td><td></td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
+                <tr><td><b>TOTAL</b></td><td></td><td style="text-align:right;"><b>${total.toFixed(2)}</b></td></tr>
+                ${paymentLines}
+                ${changeLine}
+                <tr><td colspan="3" style="text-align:center;">${amountWords.toUpperCase()}</td></tr>
+              </table>
+              <div class="totals" style="margin-top:2mm;">
+                <div><b>TAX DETAILS</b></div>
+                <div>VATABLE ${vatable.toFixed(2)}</div>
+                <div>VAT AMT ${vatAmt.toFixed(2)}</div>
+              </div>
+              <div class="etims">KRA eTIMS<br/>Sig: ${etimsSig}</div>
+              <div class="footer">
+                <div>Served by: ${saleData.cashier_name || 'Cashier'}</div>
+                <div>Thank you for your purchase!</div>
+                <div style="margin-top:2mm;font-weight:bold;">*** Powering Your Business ***</div>
               </div>
             </div>
           </body>
@@ -566,7 +675,8 @@ export interface BusinessSettings {
   address: string;
   phone: string;
   email: string;
-  tax_rate: number;
+  tax_id: string;
+  currency: string;
   updated_at?: string;
   updated_by?: number | null;
 }
@@ -582,7 +692,7 @@ export const businessSettingsAPI = {
     
     if (currentSettings?.id) {
       const response = await api.patch<BusinessSettings>(
-        `/api/business-settings/${currentSettings.id}/`,
+        '/api/business-settings/' + currentSettings.id + '/',
         settings
       );
       return response.data;
@@ -653,6 +763,45 @@ export const dairyAPI = {
       }
       return null;
     }
+  }
+};
+
+// Customer API
+export interface Customer {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const customerAPI = {
+  getAll: async (): Promise<Customer[]> => {
+    const response = await api.get('/api/customers/');
+    return response.data;
+  },
+  create: async (data: Omit<Customer, 'id' | 'created_at' | 'updated_at'>): Promise<Customer> => {
+    const response = await api.post('/api/customers/', data);
+    return response.data;
+  },
+  update: async (id: number, data: Partial<Customer>): Promise<Customer> => {
+    const response = await api.patch(`/api/customers/${id}/`, data);
+    return response.data;
+  },
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/api/customers/${id}/`);
+  },
+};
+
+// Cash Report API
+export const reportAPI = {
+  getCashReport: async (startDate: string, endDate: string) => {
+    const response = await api.get('/api/cash-report/', {
+      params: { start_date: startDate, end_date: endDate }
+    });
+    return response.data;
   }
 };
 

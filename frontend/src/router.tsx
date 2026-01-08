@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Products } from './pages/Products'
 import { Categories } from './pages/Categories'
 import { Suppliers } from './pages/Suppliers'
+import { Customers } from './pages/Customers'
 import Sales from './pages/Sales'
 import { StockMovements } from './pages/StockMovements'
 import { Settings } from './pages/Settings'
@@ -36,6 +37,10 @@ export const router = createBrowserRouter([
       {
         path: 'suppliers',
         element: <Suppliers />
+      },
+      {
+        path: 'customers',
+        element: <Customers />
       },
       {
         path: 'sales',

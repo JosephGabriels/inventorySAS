@@ -22,7 +22,23 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_HOSTS
+        value: .onrender.com
         sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://inventorysas.onrender.com
+        sync: false
+      - key: JWT_ACCESS_TOKEN_LIFETIME_DAYS
+        value: 1
+      - key: JWT_REFRESH_TOKEN_LIFETIME_DAYS
+        value: 7
+      - key: DB_POOL_SIZE
+        value: 20
+      - key: DB_MAX_OVERFLOW
+        value: 5
+      - key: DB_POOL_TIMEOUT
+        value: 30
+      - key: DB_POOL_RECYCLE
+        value: 1800
       - key: DJANGO_SUPERUSER_USERNAME
         sync: false
       - key: DJANGO_SUPERUSER_EMAIL

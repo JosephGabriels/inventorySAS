@@ -1,15 +1,18 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ProductViewSet, RegisterView
+from .views import ProductViewSet, RegisterView, CashReportView
 from . import views
 
 router = DefaultRouter()
 router.register(r'products', ProductViewSet)
+router.register(r'customers', views.CustomerViewSet)
 router.register(r'categories', views.CategoryViewSet)
 router.register(r'suppliers', views.SupplierViewSet)
 router.register(r'stock-movements', views.StockMovementViewSet)
 router.register(r'users', views.UserViewSet)
 router.register(r'sales', views.SaleViewSet)
+router.register(r'payments', views.PaymentViewSet)
+router.register(r'terminals', views.TerminalViewSet)
 router.register(r'business-settings', views.BusinessSettingsViewSet)
 
 urlpatterns = [
@@ -38,7 +41,9 @@ urlpatterns = [
     
     # Reports
     path('reports/generate/', views.GenerateReportView.as_view(), name='generate-report'),
+    # Cash report endpoint
+    path('cash-report/', CashReportView.as_view(), name='cash-report'),
     
-    # User management
-    path('users/change_password/', views.change_password, name='change_password'),
+    # User management (standalone endpoint for backward compatibility)
+    path('users/change_password/', views.change_password_standalone, name='change_password'),
 ] + router.urls

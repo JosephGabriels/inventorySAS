@@ -119,11 +119,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Helper functions for role checking
   const isAdmin = (): boolean => {
-    return user?.role === 'admin';
+    return user?.role === 'admin' || user?.is_admin === true;
   };
 
   const isManager = (): boolean => {
-    return user?.role === 'admin' || user?.role === 'manager';
+    return user?.role === 'admin' || user?.role === 'manager' || user?.is_manager === true;
   };
 
   const updateUserData = (userData: UserData) => {
